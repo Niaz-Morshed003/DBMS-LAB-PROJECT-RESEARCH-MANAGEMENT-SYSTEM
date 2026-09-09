@@ -1,35 +1,53 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-import models, schemas
+from sqlalchemy import text
+import schemas
 
 def get_faculties(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Faculty).offset(skip).limit(limit).all()
+    query = text("""
+        SELECT faculty_id, name, designation, department, office_hours
+        FROM faculty
+        LIMIT :limit OFFSET :skip;
+    """)
+    result = db.execute(query, {"limit": limit, "skip": skip})
+    return result.mappings().all()
 
 def get_faculty_by_id(db: Session, faculty_id: int):
-    return db.query(models.Faculty).filter(models.Faculty.faculty_id == faculty_id).first()
+    query = text("""
+        SELECT faculty_id, name, designation, department, office_hours
+        FROM faculty
+        WHERE faculty_id = :faculty_id;
+    """)
+    result = db.execute(query, {"faculty_id": faculty_id})
+    return result.mappings().first()
 
 def create_faculty(db: Session, faculty: schemas.FacultyCreate):
     try:
-        db_faculty = models.Faculty(
-            name=faculty.name,
-            designation=faculty.designation,
-            department=faculty.department,
-            office_hours=faculty.office_hours
-        )
-        db.add(db_faculty)
-        db.flush()
+        insert_faculty_query = text("""
+            INSERT INTO faculty (name, designation, department, office_hours)
+            VALUES (:name, :designation, :department, :office_hours);
+        """)
+        db.execute(insert_faculty_query, {
+            "name": faculty.name,
+            "designation": faculty.designation,
+            "department": faculty.department,
+            "office_hours": faculty.office_hours
+        })
+        
+        faculty_id = db.execute(text("SELECT LAST_INSERT_ID();")).scalar()
 
         if faculty.research_areas:
+            insert_area_query = text("""
+                INSERT INTO faculty_research_areas (faculty_id, research_area)
+                VALUES (:faculty_id, :research_area);
+            """)
             for area in faculty.research_areas:
-                db_area = models.FacultyResearchArea(
-                    faculty_id=db_faculty.faculty_id,
-                    research_area=area
-                )
-                db.add(db_area)
+                db.execute(insert_area_query, {
+                    "faculty_id": faculty_id,
+                    "research_area": area
+                })
         
         db.commit()
-        db.refresh(db_faculty)
-        return db_faculty
+        return get_faculty_by_id(db, faculty_id)
     except Exception as e:
         db.rollback()
         raise e
@@ -41,51 +59,74 @@ def update_faculty(db: Session, faculty_id: int, faculty_update: schemas.Faculty
 
     update_data = faculty_update.model_dump(exclude_unset=True)
     
-    if "research_areas" in update_data:
-        research_areas_data = update_data.pop("research_areas")
-        db.query(models.FacultyResearchArea).filter(
-            models.FacultyResearchArea.faculty_id == faculty_id
-        ).delete()
-        
-        if research_areas_data:
-            for area in research_areas_data:
-                db_area = models.FacultyResearchArea(
-                    faculty_id=faculty_id,
-                    research_area=area
-                )
-                db.add(db_area)
+    try:
+        if "research_areas" in update_data:
+            research_areas_data = update_data.pop("research_areas")
+            
+            delete_areas_query = text("""
+                DELETE FROM faculty_research_areas 
+                WHERE faculty_id = :faculty_id;
+            """)
+            db.execute(delete_areas_query, {"faculty_id": faculty_id})
+            
+            if research_areas_data:
+                insert_area_query = text("""
+                    INSERT INTO faculty_research_areas (faculty_id, research_area)
+                    VALUES (:faculty_id, :research_area);
+                """)
+                for area in research_areas_data:
+                    db.execute(insert_area_query, {
+                        "faculty_id": faculty_id,
+                        "research_area": area
+                    })
 
-    for key, value in update_data.items():
-        setattr(db_faculty, key, value)
+        if update_data:
+            set_clauses = [f"{key} = :{key}" for key in update_data.keys()]
+            update_query_str = f"UPDATE faculty SET {', '.join(set_clauses)} WHERE faculty_id = :faculty_id;"
+            update_data["faculty_id"] = faculty_id
+            db.execute(text(update_query_str), update_data)
 
-    db.commit()
-    db.refresh(db_faculty)
-    return db_faculty
+        db.commit()
+        return get_faculty_by_id(db, faculty_id)
+    except Exception as e:
+        db.rollback()
+        raise e
 
 def delete_faculty(db: Session, faculty_id: int):
     db_faculty = get_faculty_by_id(db, faculty_id)
     if not db_faculty:
         return None
     
-    db.delete(db_faculty)
+    query = text("DELETE FROM faculty WHERE faculty_id = :faculty_id;")
+    db.execute(query, {"faculty_id": faculty_id})
     db.commit()
     return db_faculty
 
 def create_project(db: Session, project: schemas.ResearchProjectCreate):
-    db_project = models.ResearchProject(**project.model_dump())
-    db.add(db_project)
+    query = text("""
+        INSERT INTO research_project (title, description, budget, status, faculty_id)
+        VALUES (:title, :description, :budget, :status, :faculty_id);
+    """)
+    db.execute(query, project.model_dump())
     db.commit()
-    db.refresh(db_project)
-    return db_project
+    
+    project_id = db.execute(text("SELECT LAST_INSERT_ID();")).scalar()
+    return get_project_by_id(db, project_id)
 
 def get_projects(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.ResearchProject).offset(skip).limit(limit).all()
+    query = text("SELECT * FROM research_project LIMIT :limit OFFSET :skip;")
+    result = db.execute(query, {"limit": limit, "skip": skip})
+    return result.mappings().all()
 
 def get_projects_by_faculty(db: Session, faculty_id: int):
-    return db.query(models.ResearchProject).filter(models.ResearchProject.faculty_id == faculty_id).all()
+    query = text("SELECT * FROM research_project WHERE faculty_id = :faculty_id;")
+    result = db.execute(query, {"faculty_id": faculty_id})
+    return result.mappings().all()
 
 def get_project_by_id(db: Session, project_id: int):
-    return db.query(models.ResearchProject).filter(models.ResearchProject.project_id == project_id).first()
+    query = text("SELECT * FROM research_project WHERE project_id = :project_id;")
+    result = db.execute(query, {"project_id": project_id})
+    return result.mappings().first()
 
 def update_project(db: Session, project_id: int, project_update: schemas.ResearchProjectUpdate):
     db_project = get_project_by_id(db, project_id)
@@ -93,54 +134,75 @@ def update_project(db: Session, project_id: int, project_update: schemas.Researc
         return None
     
     update_data = project_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_project, key, value)
+    if update_data:
+        set_clauses = [f"{key} = :{key}" for key in update_data.keys()]
+        update_query_str = f"UPDATE research_project SET {', '.join(set_clauses)} WHERE project_id = :project_id;"
+        update_data["project_id"] = project_id
+        db.execute(text(update_query_str), update_data)
+        db.commit()
         
-    db.commit()
-    db.refresh(db_project)
-    return db_project
+    return get_project_by_id(db, project_id)
 
 def delete_project(db: Session, project_id: int):
     db_project = get_project_by_id(db, project_id)
     if not db_project:
         return None
-    db.delete(db_project)
+    
+    query = text("DELETE FROM research_project WHERE project_id = :project_id;")
+    db.execute(query, {"project_id": project_id})
     db.commit()
     return db_project
 
 def get_applications_for_faculty(db: Session, faculty_id: int):
-    return (
-        db.query(models.Application)
-        .join(models.ResearchProject, models.Application.project_id == models.ResearchProject.project_id)
-        .filter(models.ResearchProject.faculty_id == faculty_id)
-        .all()
-    )
+    query = text("""
+        SELECT a.* 
+        FROM application a
+        INNER JOIN research_project rp ON a.project_id = rp.project_id
+        WHERE rp.faculty_id = :faculty_id;
+    """)
+    result = db.execute(query, {"faculty_id": faculty_id})
+    return result.mappings().all()
 
 def get_department_project_summary(db: Session):
-    return (
-        db.query(
-            models.Faculty.department,
-            func.count(func.distinct(models.Faculty.faculty_id)).label("faculty_count"),
-            func.count(models.ResearchProject.project_id).label("total_projects")
-        )
-        .outerjoin(models.ResearchProject, models.Faculty.faculty_id == models.ResearchProject.faculty_id)
-        .group_by(models.Faculty.department)
-        .having(func.count(models.Faculty.faculty_id) > 0)
-        .all()
-    )
+    query = text("""
+        SELECT 
+            f.department,
+            COUNT(DISTINCT f.faculty_id) AS faculty_count,
+            COUNT(rp.project_id) AS total_projects
+        FROM faculty f
+        LEFT OUTER JOIN research_project rp ON f.faculty_id = rp.faculty_id
+        GROUP BY f.department
+        HAVING COUNT(f.faculty_id) > 0;
+    """)
+    result = db.execute(query)
+    return result.mappings().all()
 
 def get_projects_above_average_applications(db: Session):
-    avg_subquery = db.query(func.avg(models.ResearchProject.applicant_count)).scalar_subquery()
-    return db.query(models.ResearchProject).filter(models.ResearchProject.applicant_count > avg_subquery).all()
+    query = text("""
+        SELECT * 
+        FROM research_project 
+        WHERE applicant_count > (
+            SELECT AVG(applicant_count) 
+            FROM research_project
+        );
+    """)
+    result = db.execute(query)
+    return result.mappings().all()
 
 def get_active_projects_from_view(db: Session):
-    return db.query(models.ActiveProjectsView).all()
+    query = text("SELECT * FROM active_projects_view;")
+    result = db.execute(query)
+    return result.mappings().all()
 
 def update_application_status(db: Session, application_id: int, status_update: schemas.ApplicationStatusUpdate):
-    db_app = db.query(models.Application).filter(models.Application.application_id == application_id).first()
-    if not db_app:
-        return None
-    db_app.status = status_update.status
+    query = text("""
+        UPDATE application 
+        SET status = :status 
+        WHERE application_id = :application_id;
+    """)
+    db.execute(query, {"status": status_update.status, "application_id": application_id})
     db.commit()
-    db.refresh(db_app)
-    return db_app
+    
+    fetch_query = text("SELECT * FROM application WHERE application_id = :application_id;")
+    result = db.execute(fetch_query, {"application_id": application_id})
+    return result.mappings().first()
