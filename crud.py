@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import schemas
@@ -8,8 +9,23 @@ def get_faculties(db: Session, skip: int = 0, limit: int = 100):
         FROM faculty
         LIMIT :limit OFFSET :skip;
     """)
-    result = db.execute(query, {"limit": limit, "skip": skip})
-    return result.mappings().all()
+    results = db.execute(query, {"limit": limit, "skip": skip}).mappings().all()
+    
+    faculties = []
+    for row in results:
+        faculty_id = row["faculty_id"]
+        area_query = text("""
+            SELECT research_area 
+            FROM faculty_research_areas 
+            WHERE faculty_id = :faculty_id;
+        """)
+        areas = db.execute(area_query, {"faculty_id": faculty_id}).scalars().all()
+        
+        faculty_data = dict(row)
+        faculty_data["research_areas"] = [{"faculty_id": faculty_id, "research_area": area} for area in areas]
+        faculties.append(faculty_data)
+        
+    return faculties
 
 def get_faculty_by_id(db: Session, faculty_id: int):
     query = text("""
@@ -17,23 +33,45 @@ def get_faculty_by_id(db: Session, faculty_id: int):
         FROM faculty
         WHERE faculty_id = :faculty_id;
     """)
-    result = db.execute(query, {"faculty_id": faculty_id})
-    return result.mappings().first()
+    faculty = db.execute(query, {"faculty_id": faculty_id}).mappings().first()
+    if not faculty:
+        return None
+    
+    area_query = text("""
+        SELECT research_area 
+        FROM faculty_research_areas 
+        WHERE faculty_id = :faculty_id;
+    """)
+    areas = db.execute(area_query, {"faculty_id": faculty_id}).scalars().all()
+    
+    result = dict(faculty)
+    result["research_areas"] = [{"faculty_id": faculty_id, "research_area": area} for area in areas]
+    return result
 
 def create_faculty(db: Session, faculty: schemas.FacultyCreate):
     try:
+        dummy_email = f"faculty_{uuid.uuid4().hex[:8]}@university.edu"
+        
+        insert_user_query = text("INSERT INTO `user` (email, role) VALUES (:email, 'faculty');")
+        db.execute(insert_user_query, {"email": dummy_email})
+        
+        user_id_query = text("SELECT LAST_INSERT_ID();")
+        user_id = db.execute(user_id_query).scalar()
+
+        if not user_id:
+            raise Exception("Failed to retrieve generated user_id.")
+
         insert_faculty_query = text("""
-            INSERT INTO faculty (name, designation, department, office_hours)
-            VALUES (:name, :designation, :department, :office_hours);
+            INSERT INTO faculty (faculty_id, name, designation, department, office_hours)
+            VALUES (:faculty_id, :name, :designation, :department, :office_hours);
         """)
         db.execute(insert_faculty_query, {
+            "faculty_id": user_id,
             "name": faculty.name,
             "designation": faculty.designation,
             "department": faculty.department,
             "office_hours": faculty.office_hours
         })
-        
-        faculty_id = db.execute(text("SELECT LAST_INSERT_ID();")).scalar()
 
         if faculty.research_areas:
             insert_area_query = text("""
@@ -42,12 +80,12 @@ def create_faculty(db: Session, faculty: schemas.FacultyCreate):
             """)
             for area in faculty.research_areas:
                 db.execute(insert_area_query, {
-                    "faculty_id": faculty_id,
+                    "faculty_id": user_id,
                     "research_area": area
                 })
         
         db.commit()
-        return get_faculty_by_id(db, faculty_id)
+        return get_faculty_by_id(db, user_id)
     except Exception as e:
         db.rollback()
         raise e
@@ -104,8 +142,8 @@ def delete_faculty(db: Session, faculty_id: int):
 
 def create_project(db: Session, project: schemas.ResearchProjectCreate):
     query = text("""
-        INSERT INTO research_project (title, description, budget, status, faculty_id)
-        VALUES (:title, :description, :budget, :status, :faculty_id);
+        INSERT INTO research_project (title, description, required_skill, status, faculty_id)
+        VALUES (:title, :description, :required_skill, :status, :faculty_id);
     """)
     db.execute(query, project.model_dump())
     db.commit()
