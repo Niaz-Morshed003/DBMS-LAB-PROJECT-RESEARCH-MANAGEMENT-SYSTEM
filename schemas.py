@@ -3,7 +3,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 class FacultyResearchAreaSchema(BaseModel):
-    faculty_id: int
+    faculty_id: Optional[int] = None
     research_area: str
 
     class Config:
