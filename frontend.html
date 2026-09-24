@@ -1745,7 +1745,15 @@
     </main>
 
     <script>
-        const API_URL = (window.__API_URL || `${window.location.protocol}//${window.location.hostname}:8000`);
+        // Single-link deploy safe: local Live Server (:5501) talks to :8000,
+        // but when UI is served from the backend itself (Render / :8000),
+        // use the same origin so one public link works for everyone.
+        const API_URL = (() => {
+            if (window.__API_URL) return window.__API_URL;
+            const port = window.location.port || "";
+            if (port && port !== "8000") return `${window.location.protocol}//${window.location.hostname}:8000`;
+            return window.location.origin;
+        })();
 
         // Global escape function for HTML safety
         function esc(v) {

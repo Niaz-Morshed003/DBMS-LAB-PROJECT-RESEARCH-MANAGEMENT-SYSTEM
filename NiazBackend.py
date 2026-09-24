@@ -3,7 +3,7 @@ import logging
 import os
 from fastapi import FastAPI, HTTPException, status, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -50,6 +50,18 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# ---- Single-link deploy: serve frontend.html from backend root ----
+# Local Live Server flow keeps working unchanged. On Render the same URL
+# serves both UI (/) and API (/auth/..., /admin/...), so one public link
+# is enough to share with everyone.
+@app.get("/", include_in_schema=False)
+def serve_frontend():
+    here = os.path.abspath(os.path.dirname(__file__))
+    path = os.path.join(here, "frontend.html")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="text/html")
+    return {"message": "Research Management Portal API. UI file not found on server."}
 
 # ---- Server-side role verification (anti-spoof) ----
 # Frontend injects X-User-Id + X-User-Role on every fetch (see frontend.html).
