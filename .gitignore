@@ -1,0 +1,7 @@
+# Local secrets — never commit real credentials
+.env
+generated_passwords_*.json
+Untitled.txt
+__pycache__/
+venv/
+*.pyc
