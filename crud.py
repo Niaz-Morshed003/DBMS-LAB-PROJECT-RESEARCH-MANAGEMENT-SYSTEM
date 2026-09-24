@@ -83,6 +83,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # new user is successfully registered/approved, the backend appends (or
 # updates) that user's entry here. This is strictly best-effort: any failure
 # is logged and never breaks the registration flow.
+# On hosted servers (Render) the disk is ephemeral, so set
+# DISABLE_JSON_STORE=true to skip file writes there. Local behaviour unchanged.
+def _json_store_disabled() -> bool:
+    try:
+        return str(os.environ.get("DISABLE_JSON_STORE", "")).strip().lower() in (
+            "true", "1", "yes", "on")
+    except Exception:
+        return False
+
 def _find_credentials_json():
     """Return the path of the existing credentials JSON file, if any."""
     try:
@@ -103,6 +112,8 @@ def _append_credentials_json(user_id, email, role, plain_password):
     (so email changes don't create duplicates). If plain_password is None
     (email-only change), the old plain password is preserved.
     """
+    if _json_store_disabled():
+        return True
     try:
         if not email:
             return False
@@ -168,6 +179,8 @@ def _append_credentials_json(user_id, email, role, plain_password):
 
 def _remove_credentials_json(user_id):
     """Remove a user's entry from the login-credentials JSON file."""
+    if _json_store_disabled():
+        return True
     try:
         path = _find_credentials_json()
         if not path or not os.path.exists(path):
@@ -190,6 +203,8 @@ def _remove_credentials_json(user_id):
 
 def _sync_credentials_email_only(user_id, new_email, role):
     """Update only the email in JSON, preserving the stored plain password."""
+    if _json_store_disabled():
+        return True
     try:
         path = _find_credentials_json()
         if not path or not os.path.exists(path):

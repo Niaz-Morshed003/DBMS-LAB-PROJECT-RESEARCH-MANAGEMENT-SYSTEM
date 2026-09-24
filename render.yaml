@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: research-portal-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn NiazBackend:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: GMAIL_SENDER_EMAIL
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: DISABLE_JSON_STORE
+        value: "true"
+      - key: ENABLE_EMAIL_SENDING
+        value: "true"

@@ -1,5 +1,6 @@
 ﻿from typing import List
 import logging
+import os
 from fastapi import FastAPI, HTTPException, status, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,9 +29,22 @@ app = FastAPI(
     version="2.2.0"
 )
 
+def _cors_origins():
+    # Local defaults keep existing behaviour unchanged.
+    origins = ["http://127.0.0.1:5501", "http://localhost:5501"]
+    extra = os.environ.get("FRONTEND_URL", "").strip()
+    if extra:
+        # Comma-separated list supported, e.g. "https://app.vercel.app,https://x.onrender.com"
+        for part in extra.split(","):
+            part = part.strip().rstrip("/")
+            if part and part not in origins:
+                origins.append(part)
+    return origins
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5501", "http://localhost:5501"],
+    allow_origins=_cors_origins(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
