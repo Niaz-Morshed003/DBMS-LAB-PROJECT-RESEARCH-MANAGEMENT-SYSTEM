@@ -46,6 +46,73 @@
         </div>
     </div>
 
+    <div id="admin-project-edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-gray-100 space-y-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-xl text-gray-900">Propose Project Update</h3>
+                    <p class="text-xs text-gray-500 mt-1">Changes apply only after the owning faculty approves them.</p>
+                </div>
+                <button onclick="closeAdminProjectEditModal()" class="text-gray-400 hover:text-gray-600 text-lg font-bold">✕</button>
+            </div>
+            <form id="admin-project-edit-form" onsubmit="submitAdminProjectEdit(event)" class="space-y-4">
+                <input type="hidden" id="admin-edit-proj-id">
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-600 font-semibold mb-1.5">Project Title</label>
+                    <input type="text" id="admin-edit-proj-title" required autocomplete="off" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-600 font-semibold mb-1.5">Description</label>
+                    <textarea id="admin-edit-proj-desc" rows="3" autocomplete="off" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-600 font-semibold mb-1.5">Required Skills</label>
+                    <input type="text" id="admin-edit-proj-skills" autocomplete="off" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-600 font-semibold mb-1.5">Status</label>
+                    <input type="text" id="admin-edit-proj-status" required autocomplete="off" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="closeAdminProjectEditModal()" class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition">Cancel</button>
+                    <button type="submit" class="w-1/2 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-amber-600/20">Send for Approval</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="sa-activity-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-0 max-w-2xl w-full mx-4 shadow-2xl border border-gray-100 overflow-hidden max-h-[90vh] flex flex-col">
+            <div id="sa-act-header" class="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="sa-act-title" class="font-bold text-lg">Admin Activity</h3>
+                        <p id="sa-act-sub" class="text-xs text-white/85"></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="sa-act-decision"></span>
+                    <button onclick="closeSaActivityModal()" class="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition text-white">✕</button>
+                </div>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 space-y-4">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span id="sa-act-chip" class="px-2.5 py-1 rounded-full text-xs font-bold border bg-purple-50 text-purple-700 border-purple-200"></span>
+                    <span id="sa-act-actor" class="text-xs text-gray-600"></span>
+                </div>
+                <div id="sa-act-body" class="space-y-4"></div>
+            </div>
+            <div class="bg-gray-50 p-4 border-t border-gray-100 flex justify-end">
+                <button onclick="closeSaActivityModal()" class="px-5 py-2.5 rounded-xl font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="info-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-gray-100 space-y-5 text-center">
             <div id="info-modal-icon" class="mx-auto w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-2xl">📨</div>
@@ -1164,11 +1231,11 @@
                     <!-- Research Projects (View Only) Dropdown -->
                     <div class="bg-white border border-gray-200 rounded-3xl shadow-sm space-y-4">
                         <button type="button" onclick="toggleAdminDropdown('projects-view')" class="w-full flex justify-between items-center bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-6 py-4 rounded-xl font-medium text-sm transition" aria-expanded="false">
-                            <span class="flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>Research Projects (View Only)</span>
+                            <span class="flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>Research Projects (Propose Edits)</span>
                             <svg id="projects-view-chevron" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <div id="projects-view-content" class="hidden space-y-4 px-6 pb-6">
-                            <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">Admins have view-only access.</div>
+                            <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">Admins can propose edits to any project. Changes apply only after the owning faculty approves them.</div>
                             <div class="flex justify-between items-center border-b border-gray-200 pb-3">
                                 <h3 class="font-bold text-lg text-amber-600">Projects List</h3>
                                 <div class="flex gap-2">
@@ -1588,6 +1655,12 @@
                         <button onclick="loadAdminNotifications()" class="text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 px-3.5 py-2 rounded-xl transition">Refresh</button>
                     </div>
                     <div id="admin-notifications-list" class="space-y-3 max-h-[32rem] overflow-y-auto pr-2"></div>
+                    <div class="flex justify-between items-center pt-2 border-t border-gray-100">
+                        <h3 class="font-bold text-base text-emerald-700">Proposal Responses (Faculty / Student feedback on your proposals)</h3>
+                        <button onclick="loadAdminResponses()" class="text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 px-3.5 py-2 rounded-xl transition">Refresh</button>
+                    </div>
+                    <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">When a faculty member or student accepts or rejects a proposal you made, their detailed response appears here.</div>
+                    <div id="admin-responses-list" class="space-y-3 max-h-[32rem] overflow-y-auto pr-2"></div>
                 </div>
 
                 <div id="notif-hub-faculty" class="hidden bg-white border border-gray-200 p-7 rounded-3xl shadow-sm space-y-5">
@@ -1643,6 +1716,10 @@
                             <p class="text-xs text-gray-500">Click to select a department and view analytics</p>
                         </div>
                     </div>
+                    <div class="space-y-2 shrink-0">
+                        <button onclick="loadAboveAverageDepts()" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-xl font-medium text-sm transition">🏆 Departments with an Above-Average Number of Projects</button>
+                    </div>
+                    <div id="stat-above-avg" class="shrink-0"></div>
                 </div>
 
                 <!-- Popular Projects Card -->
@@ -2248,7 +2325,7 @@
                         </div>
                         <div class="flex gap-1.5 shrink-0 flex-wrap justify-end">
                             <button onclick="closeAllFacultyModals(); showProjectDetailOthers(${pid})" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-xl font-semibold">Details</button>
-                            ${role === 'admin' ? `<span class="px-2.5 py-1 text-xs text-gray-500 font-medium bg-white border border-gray-200 rounded-lg">View Only</span>` : ''}
+                            ${role === 'admin' ? `<button onclick="closeAllFacultyModals(); openAdminProjectEditModal(${pid})" class="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-xl font-semibold">Propose Edit</button>` : ''}
                             ${role === 'superadmin' ? `<button onclick="saEditProjectById(${pid})" class="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-xl font-semibold">Edit</button>
                             <button onclick="saDeleteProjectById(${pid})" class="px-3 py-1.5 text-xs bg-rose-600 text-white rounded-xl font-semibold">Delete</button>` : ''}
                             ${isOwn ? `<button onclick="searchEditOwnProject(${pid})" class="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-xl font-semibold">Edit</button>
@@ -3085,13 +3162,17 @@
             }
         }
 
+        let _saAuditCache = {};
+
         async function saLoadAudit(intoHub) {
-            const box = document.getElementById(intoHub ? 'superadmin-notifications-list' : 'sa-audit-list');
+            const boxId = intoHub ? 'superadmin-notifications-list' : 'sa-audit-list';
+            const box = document.getElementById(boxId);
             if (!box) return;
             try {
                 const res = await fetch(`${API_URL}/superadmin/audit?limit=100`);
                 if (!res.ok) throw new Error('failed');
                 const rows = await res.json();
+                _saAuditCache[boxId] = Array.isArray(rows) ? rows : [];
                 box.innerHTML = (rows || []).length ? rows.map(a => {
                     const isAdmin = !!(a.is_admin_activity || (a.type === 'AdminActivity'));
                     const badge = isAdmin
@@ -3100,14 +3181,20 @@
                     const who = isAdmin
                         ? `${esc(a.admin_email || ('Admin #' + (a.actor_id != null ? a.actor_id : '—')))}${a.notification_type ? ' • ' + esc(a.notification_type) : ''}`
                         : `${esc(a.target_type || '')} #${a.target_id != null ? esc(String(a.target_id)) : '—'}`;
+                    const disp = a.display || {};
+                    const title = disp.headline || a.detail || a.action || '';
+                    const detailBtn = (isAdmin && disp && (disp.headline || (disp.changes && disp.changes.length) || (disp.applicant && Object.keys(disp.applicant).length)))
+                        ? `<button onclick="saOpenActivityDetail('${boxId}', ${a.notification_id})" class="mt-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition">🔍 View Full Details</button>`
+                        : '';
                     return `
                     <div class="bg-gray-50 p-3 rounded-xl border ${isAdmin ? 'border-amber-200' : 'border-gray-200'} text-xs space-y-1">
                         <div class="flex justify-between items-center gap-2">
-                            <span class="font-bold ${isAdmin ? 'text-amber-700' : 'text-purple-700'}">${esc(a.action || '')}</span>
+                            <span class="font-bold ${isAdmin ? 'text-amber-700' : 'text-purple-700'}">${esc(disp.action_label || a.action || '')}</span>
                             <span class="text-gray-400">${esc(a.created_at || '')}</span>
                         </div>
                         <div>${badge} <span class="text-gray-600 ml-1">${who}</span></div>
-                        <div class="text-gray-600">${esc(a.detail || '')}</div>
+                        <div class="text-gray-600">${esc(title || '')}</div>
+                        ${detailBtn}
                     </div>`;
                 }).join('') : '<div class="text-center text-gray-500 text-xs py-4">No recorded actions yet. Every admin approve / reject / edit-proposal will appear here permanently.</div>';
             } catch (e) {
@@ -3115,6 +3202,96 @@
                 box.innerHTML = '';
                 listLoadError(intoHub ? 'superadmin-notifications-list' : 'sa-audit-list');
             }
+        }
+
+        function saFindAuditRow(boxId, nid) {
+            const rows = _saAuditCache[boxId] || [];
+            return rows.find(x => Number(x.notification_id) === Number(nid)) || null;
+        }
+
+        function saOpenActivityDetail(boxId, nid) {
+            const a = saFindAuditRow(boxId, nid);
+            if (!a || !a.display) { showToast('Details not available for this record.', 'error'); return; }
+            const d = a.display;
+            const tone = d.tone === 'success' ? { g: 'from-emerald-600 to-teal-600', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                : d.tone === 'danger' ? { g: 'from-rose-600 to-red-600', chip: 'bg-rose-50 text-rose-700 border-rose-200' }
+                : { g: 'from-purple-600 to-indigo-600', chip: 'bg-purple-50 text-purple-700 border-purple-200' };
+            const decision = d.decision ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-white/20 border border-white/30">${esc(d.decision)}</span>` : '';
+
+            let targetHtml = '';
+            const t = d.target || {};
+            const ap = d.applicant || {};
+            if (ap && Object.keys(ap).length) {
+                const rows = Object.entries(ap).map(([k, v]) => `
+                    <div class="flex gap-2 text-xs py-1.5 border-b border-gray-100 last:border-0">
+                        <span class="w-32 shrink-0 text-gray-500 font-semibold">${esc(k)}</span>
+                        <span class="text-gray-900 font-medium break-words">${esc(v)}</span>
+                    </div>`).join('');
+                targetHtml = `
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-100">
+                        <p class="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Applicant Dossier — everything they signed up with</p>
+                        <p class="font-bold text-gray-900">${esc(t.name || '')}</p>
+                        <p class="text-xs text-blue-600 mb-2">${esc(t.email || '')}</p>
+                        <div class="bg-white rounded-xl border border-amber-100 px-3 py-1">${rows}</div>
+                    </div>`;
+            } else if (t && (t.name !== '—' || t.email !== '—' || (t.meta && Object.keys(t.meta).length))) {
+                const meta = t.meta || {};
+                const metaRows = Object.entries(meta).map(([k, v]) => `
+                    <div class="flex gap-2 text-xs py-1 border-b border-gray-100 last:border-0">
+                        <span class="w-28 shrink-0 text-gray-500 font-semibold">${esc(k)}</span>
+                        <span class="text-gray-900 font-medium">${esc(v)}</span>
+                    </div>`).join('');
+                targetHtml = `
+                    <div class="bg-white p-4 rounded-2xl border border-gray-200">
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Concerned Person / Item</p>
+                        <p class="font-bold text-gray-900">${esc(t.name || '—')}${t.id != null ? ` <span class="text-xs text-gray-400 font-mono">(ID: ${esc(String(t.id))})</span>` : ''}</p>
+                        <p class="text-xs text-blue-600 mb-1">${esc(t.email || '')}</p>
+                        ${metaRows ? `<div class="mt-1">${metaRows}</div>` : ''}
+                        <p class="text-[11px] text-gray-400 mt-1">Request: ${esc((d.request || {}).type || '')} ${((d.request || {}).id != null) ? '#' + esc(String((d.request || {}).id)) : ''}</p>
+                    </div>`;
+            }
+
+            let changesHtml = '';
+            const ch = Array.isArray(d.changes) ? d.changes : [];
+            if (ch.length) {
+                changesHtml = `
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Exact Changes / Request Detail</p>
+                        <div class="space-y-2">` + ch.map(c => `
+                            <div class="bg-white p-3 rounded-xl border border-gray-200">
+                                <p class="text-xs font-bold text-gray-800 mb-1.5">${esc(c.label || '')}</p>
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <div class="bg-rose-50 border border-rose-100 rounded-lg p-2"><p class="text-[10px] font-bold uppercase text-rose-600">Old</p><p class="text-gray-800 font-medium break-words">${esc(c.old)}</p></div>
+                                    <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-2"><p class="text-[10px] font-bold uppercase text-emerald-600">New</p><p class="text-gray-800 font-medium break-words">${esc(c.new)}</p></div>
+                                </div>
+                            </div>`).join('') + `
+                        </div>
+                    </div>`;
+            }
+
+            let reqHtml = '';
+            const rf = Array.isArray(d.request_fields) ? d.request_fields : [];
+            if (rf.length) {
+                reqHtml = `
+                    <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Requested Item Detail</p>
+                        ` + rf.map(r => `<div class="flex gap-2 text-xs py-1 border-b border-gray-100 last:border-0"><span class="w-32 shrink-0 text-gray-500 font-semibold">${esc(r.label || '')}</span><span class="text-gray-900 font-medium break-words">${esc(r.value)}</span></div>`).join('') + `
+                    </div>`;
+            }
+
+            document.getElementById('sa-act-header').className = `bg-gradient-to-r ${tone.g} p-6 text-white flex items-center justify-between`;
+            document.getElementById('sa-act-title').textContent = d.action_label || 'Admin Activity';
+            document.getElementById('sa-act-sub').textContent = d.headline || '';
+            document.getElementById('sa-act-decision').innerHTML = decision;
+            document.getElementById('sa-act-actor').innerHTML = `<span class="font-semibold text-gray-700">Acting Admin:</span> <span class="font-bold text-purple-700">${esc((a.admin_email || ('Admin #' + (a.actor_id != null ? a.actor_id : '—'))))}</span> <span class="text-xs text-gray-400">• ${esc(a.created_at || '')} • Audit #${a.notification_id}</span>`;
+            document.getElementById('sa-act-body').innerHTML = targetHtml + changesHtml + reqHtml;
+            document.getElementById('sa-act-chip').className = `px-2.5 py-1 rounded-full text-xs font-bold border ${tone.chip}`;
+            document.getElementById('sa-act-chip').textContent = d.action_label || '';
+            document.getElementById('sa-activity-modal').classList.remove('hidden');
+        }
+
+        function closeSaActivityModal() {
+            document.getElementById('sa-activity-modal').classList.add('hidden');
         }
 
         async function saSaveSelf() {
@@ -3411,7 +3588,7 @@
 
             const esc = (v) => (v === null || v === undefined || v === '') ? '—' : v;
             const formatChanges = (changes) => {
-                const labels = { name: 'Name', email: 'Email', designation: 'Designation', department: 'Department', office_hours: 'Office Hours', research_areas: 'Research Areas', cgpa: 'CGPA', semester: 'Semester', github_link: 'GitHub Link', cv_link: 'CV Link', skills: 'Skills', interests: 'Research Interests' };
+                const labels = { name: 'Name', email: 'Email', designation: 'Designation', department: 'Department', office_hours: 'Office Hours', research_areas: 'Research Areas', cgpa: 'CGPA', semester: 'Semester', github_link: 'GitHub Link', cv_link: 'CV Link', skills: 'Skills', interests: 'Research Interests', title: 'Project Title', description: 'Description', required_skill: 'Required Skill', status: 'Status' };
                 return Object.entries(changes || {}).map(([field, val]) => {
                     const oldVal = Array.isArray(val.old) ? (val.old.join(', ') || '—') : esc(val.old);
                     const newVal = Array.isArray(val.new) ? (val.new.join(', ') || '—') : esc(val.new);
@@ -3494,6 +3671,8 @@
                     return { icon: '🗑️', title: 'Account Deletion Request', body: `<span class="font-medium text-gray-800">${esc(n.faculty_name)}</span> has requested the permanent removal of their faculty account.` };
                 case 'AdminFacultyEditRequest':
                     return { icon: '✏️', title: 'Profile Update Proposal', body: `The administration proposes the following updates to your profile:${formatChanges(data.changes)}` };
+                case 'AdminProjectEditRequest':
+                    return { icon: '📝', title: 'Project Update Proposal', body: `The administration proposes the following updates to your project <span class="text-blue-700 font-medium">${esc(data.project_title || ('Project #' + (data.project_id || '')))}</span>:${formatChanges(data.changes)}` };
                 case 'AdminStudentEditRequest':
                     return { icon: '✏️', title: 'Student Profile Update Proposed', body: `You proposed the following updates to <span class="font-medium text-gray-800">${esc(n.faculty_name || 'the student')}</span>'s profile:${formatChanges(data.changes)}` };
                 case 'ProjectCreation':
@@ -3525,8 +3704,12 @@
                     return { icon: '📝', title: 'Project Updated by Administration', body: `Your project titled <span class="text-blue-700 font-medium">${esc(data.title)}</span> has been updated by the administration.${data.changes ? `<div class="mt-1 text-xs text-gray-600">Changes: ${esc(data.changes)}</div>` : ''}` };
                 case 'AccountDeletionResult':
                     return { icon: '❌', title: 'Account Deletion Rejected', body: `Your request for permanent account deletion has been <span class="font-semibold text-rose-700">rejected</span> by the administration.` };
-                case 'DesignationChangeResult':
-                    return { icon: '❌', title: 'Designation Change Rejected', body: `Your request to change your designation to <span class="text-blue-700 font-medium">${esc(data.new_designation)}</span> has been <span class="font-semibold text-rose-700">rejected</span> by the administration.` };
+                case 'DesignationChangeResult': {
+                    const dsgDetail = (data.changes && Object.keys(data.changes).length)
+                        ? formatChanges(data.changes)
+                        : `<div class="mt-1">Requested designation: <span class="text-blue-700 font-medium">${esc(data.new_designation)}</span></div>`;
+                    return { icon: '❌', title: 'Designation Change Rejected', body: `Your designation change request has been <span class="font-semibold text-rose-700">rejected</span> by the administration. The exact rejected request is detailed below:${dsgDetail}` };
+                }
                 case 'StudentSignup': {
                     const areas = Array.isArray(data.research_areas) ? data.research_areas : (data.interests || []);
                     const otpBadge = (data.otp_status === 'Matched' || (data.sent_otp && data.entered_otp && data.sent_otp === data.entered_otp))
@@ -3579,6 +3762,7 @@
         }
 
         async function loadAdminNotifications() {
+            try { if (typeof loadAdminResponses === 'function') loadAdminResponses(); } catch (e) {}
             try {
                 const res = await fetch(`${API_URL}/admin/notifications`);
                 const notifications = await res.json();
@@ -3685,6 +3869,7 @@
                     const isResultNotif = resultTypes.includes(n.type) && (n.status === 'Pending' || n.type === 'ApplicationDecision');
                     const isClickable = clickableTypes.includes(n.type);
                     const isPendingAction = (n.status === 'Pending' && n.type === 'AdminFacultyEditRequest') ||
+                                             (n.status === 'Pending' && n.type === 'AdminProjectEditRequest') ||
                                              (n.status === 'AwaitingFacultyConfirmation' && n.type === 'DesignationChange') ||
                                              (n.status === 'AwaitingFacultyConfirmation' && n.type === 'ProjectCreation');
                     const isAccepted = n.status === 'Accepted';
@@ -3934,16 +4119,21 @@
                 const faculties = await fcR.json();
                 const mp = {}; (faculties || []).forEach(f => { mp[f.faculty_id || f.id] = f.department; });
                 const filtered = (projects || []).filter(p => (p.department || mp[p.faculty_id || p.facultyId]) === dept);
-                box.innerHTML = filtered.length ? filtered.map(p => `
+                box.innerHTML = filtered.length ? filtered.map(p => {
+                    const pid = p.project_id || p.id;
+                    return `
                     <div class="bg-gray-50 p-3.5 rounded-xl border border-gray-200 flex justify-between items-center text-sm shadow-sm">
                         <div>
                             <p class="font-medium text-gray-900">${p.title}</p>
                             <p class="text-xs text-gray-600 mt-0.5">Faculty: ${p.faculty_name || 'N/A'} (${p.department || 'N/A'})</p>
                             <p class="text-xs text-gray-600 mt-0.5">Status: ${p.status} | Skills: ${p.required_skill || 'N/A'}</p>
                         </div>
-                        <span class="text-xs text-gray-500 font-medium bg-white border border-gray-200 px-2.5 py-1 rounded-lg">View Only</span>
+                        <div class="flex gap-1.5 shrink-0">
+                            <button onclick="showProjectDetail(${pid})" class="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50">Details</button>
+                            <button onclick="openAdminProjectEditModal(${pid})" class="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700">Propose Edit</button>
+                        </div>
                     </div>
-                `).join('') : '<div class="text-center text-gray-500 text-sm py-3">No projects in this department</div>';
+                `}).join('') : '<div class="text-center text-gray-500 text-sm py-3">No projects in this department</div>';
             } catch (e) { console.error(e); listLoadError('project-list'); }
         }
 
@@ -4257,6 +4447,143 @@
             }
         }
 
+        // ========== ADMIN PROJECT EDIT PROPOSAL (Phase-2) ==========
+        // Admins can propose edits to any project from anywhere a project is
+        // visible. Nothing is applied directly — the owning faculty must Accept.
+        async function openAdminProjectEditModal(pid) {
+            try { if (typeof closeAllFacultyModals === 'function') closeAllFacultyModals(); } catch (e) {}
+            try {
+                const res = await fetch(`${API_URL}/admin/projects/${pid}`);
+                if (!res.ok) throw new Error('not found');
+                const p = await res.json();
+                document.getElementById('admin-edit-proj-id').value = pid;
+                document.getElementById('admin-edit-proj-title').value = p.title || '';
+                document.getElementById('admin-edit-proj-desc').value = p.description || '';
+                document.getElementById('admin-edit-proj-skills').value = p.required_skill || p.required_skills || '';
+                document.getElementById('admin-edit-proj-status').value = p.status || 'Active';
+                document.getElementById('admin-project-edit-modal').classList.remove('hidden');
+            } catch (e) {
+                console.error(e);
+                showToast('Could not load project for editing.', 'error');
+            }
+        }
+
+        function closeAdminProjectEditModal() {
+            document.getElementById('admin-project-edit-modal').classList.add('hidden');
+        }
+
+        let _adminProjEditSending = false;
+
+        async function submitAdminProjectEdit(e) {
+            e.preventDefault();
+            if (_adminProjEditSending) return;
+            _adminProjEditSending = true;
+            const submitBtn = document.querySelector('#admin-project-edit-form button[type="submit"]');
+            const origText = submitBtn ? submitBtn.textContent : '';
+            try {
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Sending...'; }
+                const pid = document.getElementById('admin-edit-proj-id').value;
+                const payload = {
+                    title: document.getElementById('admin-edit-proj-title').value,
+                    description: document.getElementById('admin-edit-proj-desc').value,
+                    required_skill: document.getElementById('admin-edit-proj-skills').value,
+                    status: document.getElementById('admin-edit-proj-status').value
+                };
+                const res = await fetch(`${API_URL}/admin/projects/${pid}/request-edit`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showToast(data.detail || 'Could not submit the edit proposal.', 'error');
+                    return;
+                }
+                closeAdminProjectEditModal();
+                showInfoModal(
+                    '📮',
+                    'Proposal Sent to Faculty',
+                    'Your proposed project updates have been delivered to the owning faculty member with a detailed email, awaiting their approval.'
+                );
+            } catch (err) {
+                console.error(err);
+                showToast('Could not submit the edit proposal.', 'error');
+            } finally {
+                _adminProjEditSending = false;
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origText; }
+            }
+        }
+
+        // ========== ADMIN PROPOSAL RESPONSES (Phase-2 feedback) ==========
+        function getCurrentAdminId() {
+            try {
+                const u = JSON.parse(localStorage.getItem('user') || '{}');
+                return Number(u.user_id || u.id || u.userId);
+            } catch (e) { return NaN; }
+        }
+
+        async function loadAdminResponses() {
+            const box = document.getElementById('admin-responses-list');
+            if (!box) return;
+            const aid = getCurrentAdminId();
+            if (!aid) { box.innerHTML = ''; return; }
+            try {
+                const res = await fetch(`${API_URL}/admin/proposal-responses?admin_id=${aid}`);
+                if (!res.ok) throw new Error('failed');
+                const rows = await res.json();
+                if (!rows || !rows.length) {
+                    box.innerHTML = '<div class="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs text-gray-500 font-medium">No proposal responses yet. When a faculty member or student accepts or rejects your proposals, it will appear here.</div>';
+                    return;
+                }
+                box.innerHTML = rows.map(n => {
+                    let d = {};
+                    try { d = JSON.parse(n.payload); } catch (e) {}
+                    const accepted = (d.decision || n.status) === 'Accepted';
+                    const badge = accepted
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Accepted</span>'
+                        : (String(d.decision || n.status) === 'Acknowledged'
+                            ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">Acknowledged</span>'
+                            : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">Rejected</span>');
+                    const icon = accepted ? '✅' : '❌';
+                    return `
+                    <div class="bg-gradient-to-br from-gray-50 to-white p-4 rounded-2xl border border-gray-200 text-sm shadow-sm">
+                        <div class="flex gap-3">
+                            <div class="w-9 h-9 shrink-0 rounded-full bg-blue-50 flex items-center justify-center text-base">${icon}</div>
+                            <div class="min-w-0">
+                                <p class="font-bold text-gray-900 tracking-tight">${esc(d.responder || 'Someone')} ${accepted ? 'accepted' : 'rejected'} your proposal ${badge}</p>
+                                <p class="text-xs text-gray-600 mt-1 leading-relaxed">${esc(d.details || d.message || '')}</p>
+                                <p class="text-[11px] text-gray-400 mt-1">Request: ${esc(d.request_type || '')} #${esc(String(d.request_id || ''))}</p>
+                            </div>
+                        </div>
+                        ${String(n.status) !== 'Acknowledged' ? `
+                        <div class="mt-3">
+                            <button onclick="ackAdminResponse(${n.notification_id})" class="text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl font-medium hover:bg-gray-200 text-xs">Acknowledge</button>
+                        </div>` : ''}
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error(e);
+                listLoadError('admin-responses-list');
+            }
+        }
+
+        async function ackAdminResponse(nid) {
+            try {
+                const aid = getCurrentAdminId();
+                const res = await fetch(`${API_URL}/admin/proposal-responses/${nid}/ack?admin_id=${aid}`, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showToast(data.detail || 'Could not acknowledge.', 'error');
+                    return;
+                }
+                showToast('Response acknowledged.');
+                loadAdminResponses();
+            } catch (e) {
+                console.error(e);
+                showToast('Could not acknowledge.', 'error');
+            }
+        }
+
         async function loadProjects() {
             try {
                 const [projRes, appRes] = await Promise.all([
@@ -4283,7 +4610,10 @@
                                 <p class="text-xs text-gray-600 mt-0.5">Status: ${p.status} | Skills: ${p.required_skill || p.required_skills || 'N/A'}</p>
                                 <p class="text-blue-600 font-semibold text-xs mt-1">📂 Applications Received: ${count}</p>
                             </div>
-                            <span class="text-xs text-gray-500 font-medium bg-white border border-gray-200 px-2.5 py-1 rounded-lg">View Only</span>
+                            <div class="flex gap-1.5 shrink-0">
+                                <button onclick="showProjectDetail(${pid})" class="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50">Details</button>
+                                <button onclick="openAdminProjectEditModal(${pid})" class="px-3 py-1.5 text-xs bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700">Propose Edit</button>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -4990,6 +5320,55 @@
             document.getElementById('dept-summary-detail').innerHTML = '';
         }
 
+        // DBMS-criteria showcase: COUNT + AVG with GROUP BY + HAVING (nested subquery).
+        // Maths shown step-by-step: total running projects / total departments
+        // = average per department; departments strictly above it are listed.
+        // Recomputed live on every click, so numbers rise/fall with the system.
+        async function loadAboveAverageDepts() {
+            const box = document.getElementById('stat-above-avg');
+            if (!box) return;
+            box.innerHTML = '<div class="text-center text-indigo-600 text-xs py-4">Loading...</div>';
+            try {
+                const res = await fetch(`${API_URL}/statistics/departments-above-average`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const rows = (data && Array.isArray(data.above_average_departments)) ? data.above_average_departments : [];
+                const total = (data && data.total_running_projects != null) ? data.total_running_projects : '—';
+                const depts = (data && data.total_departments != null) ? data.total_departments : '—';
+                const avg = (data && data.average_benchmark != null) ? data.average_benchmark : '—';
+                const listHtml = rows.length ? rows.map(r => `
+                        <div class="bg-white p-3 rounded-xl border border-indigo-100 flex justify-between items-center text-sm shadow-sm">
+                            <div>
+                                <p class="font-bold text-gray-900">${esc(r.department)}</p>
+                                <p class="text-xs font-bold text-purple-700 mt-0.5">Faculty: ${esc(String(r.faculty_count != null ? r.faculty_count : '—'))}</p>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white">${esc(String(r.running_projects != null ? r.running_projects : 0))} running</span>
+                        </div>`).join('')
+                    : '<div class="text-center text-gray-500 text-sm py-3">No department currently stands above the average.</div>';
+                box.innerHTML = `
+                    <div class="bg-indigo-50/60 p-4 rounded-2xl border border-indigo-100 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <p class="font-bold text-indigo-900 text-sm">🏆 Departments with an Above-Average Number of Projects</p>
+                            <button onclick="loadAboveAverageDepts()" class="text-[11px] font-semibold text-indigo-700 bg-white border border-indigo-200 px-2.5 py-1 rounded-lg hover:bg-indigo-50 transition">↻ Refresh</button>
+                        </div>
+                        <p class="text-[11px] text-indigo-700/80 italic">The departments leading the system — each carrying more running projects than the average department.</p>
+                        <div class="bg-white p-3.5 rounded-xl border border-indigo-100 text-sm space-y-1.5">
+                            <p class="text-xs font-bold text-indigo-900 uppercase tracking-wider">The reasoning, in plain figures (live)</p>
+                            <div class="flex justify-between text-xs"><span class="font-bold text-blue-700">Running projects across the entire system:</span><span class="font-bold text-blue-700">${esc(String(total))}</span></div>
+                            <div class="flex justify-between text-xs"><span class="font-bold text-emerald-700">Departments sharing them:</span><span class="font-bold text-emerald-700">${esc(String(depts))}</span></div>
+                            <div class="flex justify-between text-xs border-t border-gray-100 pt-1.5"><span class="font-bold text-indigo-700">Average load per department (${esc(String(total))} ÷ ${esc(String(depts))}):</span><span class="font-bold text-indigo-700">${esc(String(avg))} projects</span></div>
+                        </div>
+                        <p class="text-[11px] text-indigo-700/80">Departments ahead of the average of <b>${esc(String(avg))}</b> (${rows.length}):</p>
+                        <div class="space-y-2">${listHtml}</div>
+                        <p class="text-[11px] text-gray-400 italic">These figures breathe with the system — add or remove a project anywhere and refresh to watch them move.</p>
+                    </div>`;
+            } catch (e) {
+                console.error(e);
+                box.innerHTML = '';
+                listLoadError('stat-above-avg');
+            }
+        }
+
         async function loadDeptSummaryDetail() {
             const dept = document.getElementById('dept-summary-select').value;
             if (!dept) {
@@ -5521,7 +5900,7 @@
         }
 
         function closeAllFacultyModals() {
-            ['faculty-detail-modal', 'project-detail-modal-others', 'application-detail-modal', 'project-detail-modal', 'edit-faculty-modal', 'dept-summary-modal', 'popular-dept-modal', 'popular-overall-modal', 'active-dept-modal', 'active-overall-modal', 'graph-modal', 'info-modal', 'faculty-student-detail-modal', 'sa-edit-modal', 'sa-project-modal'].forEach(function(mid) {
+            ['faculty-detail-modal', 'project-detail-modal-others', 'application-detail-modal', 'project-detail-modal', 'edit-faculty-modal', 'dept-summary-modal', 'popular-dept-modal', 'popular-overall-modal', 'active-dept-modal', 'active-overall-modal', 'graph-modal', 'info-modal', 'faculty-student-detail-modal', 'sa-edit-modal', 'sa-project-modal', 'admin-project-edit-modal', 'sa-activity-modal'].forEach(function(mid) {
                 const el = document.getElementById(mid);
                 if (el) el.classList.add('hidden');
             });
@@ -5610,7 +5989,8 @@
                 document.getElementById('faculty-detail-projects').innerHTML = (pr && pr.length) ? pr.map(function(p) {
                     const pid2 = p.project_id || p.id;
                     const apply2 = (typeof isStudent === 'function' && isStudent()) ? `<button onclick="event.stopPropagation(); closeFacultyDetailModal(); openApplyModal(${pid2}, '${(p.title||'').replace(/'/g,'')}')" class="px-2 py-1 text-xs bg-emerald-600 text-white rounded-lg shrink-0">Apply</button>` : '';
-                    return `<div class="w-full bg-white p-3 rounded-xl border border-gray-200 text-sm flex justify-between items-center gap-2"><button onclick="closeFacultyDetailModal(); showProjectDetailOthers(${pid2})" class="text-left flex-1"><span class="font-medium text-blue-700">${p.title}</span><span class="text-gray-500 ml-2">${p.status || 'Active'}</span></button>${apply2}</div>`;
+                    const propose2 = (typeof currentRole !== 'undefined' && currentRole === 'admin') ? `<button onclick="event.stopPropagation(); closeFacultyDetailModal(); openAdminProjectEditModal(${pid2})" class="px-2 py-1 text-xs bg-amber-600 text-white rounded-lg shrink-0">Propose Edit</button>` : '';
+                    return `<div class="w-full bg-white p-3 rounded-xl border border-gray-200 text-sm flex justify-between items-center gap-2"><button onclick="closeFacultyDetailModal(); showProjectDetailOthers(${pid2})" class="text-left flex-1"><span class="font-medium text-blue-700">${p.title}</span><span class="text-gray-500 ml-2">${p.status || 'Active'}</span></button>${apply2}${propose2}</div>`;
                 }).join('') : '<span class="text-gray-500 text-sm">No projects</span>';
             } catch (e) { detailLoadError(e, 'faculty profile'); }
         }
@@ -6401,6 +6781,27 @@
                     if(n.type === 'StudentProfileChangeResult' || n.type === 'StudentAccountDeletionResult'){
                         const outcome = d.outcome || 'processed';
                         const oc = outcome === 'accepted' ? { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100', icon: '✅' } : { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-100', icon: '❌' };
+                        const _stuLabels = { name: 'Name', email: 'Email', cgpa: 'CGPA', department: 'Department', semester: 'Semester', github_link: 'GitHub Link', cv_link: 'CV Link', skills: 'Skills', interests: 'Research Interests' };
+                        const _stuEsc = (v) => {
+                            if (v === null || v === undefined || v === '') return '—';
+                            if (Array.isArray(v)) return v.join(', ') || '—';
+                            return String(v);
+                        };
+                        let _stuChangesHtml = '';
+                        try {
+                            const _ch = (d.changes && typeof d.changes === 'object') ? d.changes : {};
+                            _stuChangesHtml = Object.entries(_ch).map(([f, val]) => {
+                                const _old = (val && typeof val === 'object' && ('old' in val || 'new' in val)) ? _stuEsc(val.old) : '—';
+                                const _new = (val && typeof val === 'object' && ('old' in val || 'new' in val)) ? _stuEsc(val.new) : _stuEsc(val);
+                                return `<div class="bg-white p-3 rounded-xl border border-gray-200 mt-2 text-left">
+                                    <div class="text-xs font-bold text-gray-800 mb-1.5">${esc(_stuLabels[String(f).toLowerCase()] || String(f).replace(/_/g, ' '))}</div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                                        <div class="flex flex-col gap-0.5"><span class="text-[10px] font-bold uppercase tracking-wider text-rose-600">Requested</span><span class="text-gray-700 font-medium break-words">${esc(_old)}</span></div>
+                                        <div class="flex flex-col gap-0.5 border-l border-gray-200 pl-2.5"><span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Rejected Value</span><span class="text-gray-700 font-medium break-words">${esc(_new)}</span></div>
+                                    </div>
+                                </div>`;
+                            }).join('');
+                        } catch (e) { _stuChangesHtml = ''; }
                         return `
                             <div class="${oc.bg} ${oc.border} border p-4 rounded-2xl">
                                 <div class="flex items-center justify-between mb-2">
@@ -6411,6 +6812,7 @@
                                     <span class="px-2 py-1 rounded-full text-xs font-bold ${oc.text} ${oc.bg}">${n.status}</span>
                                 </div>
                                 <div class="text-sm text-gray-700">${d.message || 'Your request has been processed.'}</div>
+                                ${_stuChangesHtml ? `<div class="mt-1 text-xs font-semibold text-gray-600">Rejected request details:</div>${_stuChangesHtml}` : ''}
                             </div>
                             <div class="mt-2 flex gap-2">
                                 <button onclick="ackStudentNotif(${n.notification_id})" class="w-full px-3 py-2 rounded-xl bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition">Acknowledge</button>

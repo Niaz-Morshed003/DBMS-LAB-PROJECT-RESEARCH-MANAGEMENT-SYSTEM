@@ -68,7 +68,7 @@ def serve_frontend():
 # Sensitive endpoints verify the pair against the user table instead of
 # trusting the role string alone.
 SENSITIVE_PREFIXES = (
-    "/admin/students", "/admin/notifications",
+    "/admin/students", "/admin/notifications", "/admin/proposal-responses",
     "/admin/applications", "/faculty/students",
     "/faculty/applications", "/faculty/notifications",
     "/student/",
@@ -308,6 +308,53 @@ def admin_request_student_edit(student_id: int, edit: schemas.AdminStudentEditRe
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.put("/admin/projects/{project_id}/request-edit", tags=["Admin Module - Project Management"])
+def admin_request_project_edit(project_id: int, edit: schemas.AdminProjectEditRequest, db: Session = Depends(get_db), x_user_id: str | None = Header(None, alias="X-User-Id")):
+    # Phase-2: admin proposes project edits from anywhere a project is visible.
+    # Nothing is applied directly — the owning faculty must Accept first.
+    try:
+        try:
+            _actor = int(x_user_id) if x_user_id is not None else None
+        except (TypeError, ValueError):
+            _actor = None
+        return crud.request_project_edit_by_admin(db=db, project_id=project_id, edit=edit, actor_id=_actor)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/admin/proposal-responses", tags=["Admin Module - Notifications"])
+def admin_get_proposal_responses(admin_id: int, db: Session = Depends(get_db), x_user_id: str | None = Header(None, alias="X-User-Id"), x_user_role: str | None = Header(None, alias="X-User-Role")):
+    # Phase-2: feedback notifications for the handling admin — which
+    # faculty/student accepted or rejected the admin's proposals, in detail.
+    try:
+        role = (x_user_role or "").strip().lower()
+        if role not in ("admin", "superadmin"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+        if role == "admin":
+            try:
+                if int(x_user_id) != int(admin_id):
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only view your own responses.")
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-User-Id header.")
+        return crud.get_admin_responses(db=db, admin_id=admin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/admin/proposal-responses/{notification_id}/ack", tags=["Admin Module - Notifications"])
+def admin_ack_proposal_response(notification_id: int, admin_id: int, db: Session = Depends(get_db), x_user_id: str | None = Header(None, alias="X-User-Id"), x_user_role: str | None = Header(None, alias="X-User-Role")):
+    try:
+        role = (x_user_role or "").strip().lower()
+        if role not in ("admin", "superadmin"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+        if role == "admin":
+            try:
+                if int(x_user_id) != int(admin_id):
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only acknowledge your own responses.")
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-User-Id header.")
+        return crud.ack_admin_response(db=db, notification_id=notification_id, admin_id=admin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.get("/admin/notifications", response_model=List[schemas.NotificationResponse], tags=["Admin Module - Notifications"])
 def admin_get_notifications(db: Session = Depends(get_db)):
     return crud.get_pending_notifications(db=db)
@@ -522,6 +569,15 @@ def read_popular_projects_overall(db: Session = Depends(get_db)):
 def read_popular_projects_by_dept(department: str, db: Session = Depends(get_db)):
     try:
         return crud.get_popular_projects_by_department(db=db, department=department) or {}
+    except Exception as e:
+        logger.exception('statistics error: %s', e)
+        return {}
+
+@app.get("/statistics/departments-above-average", tags=["Statistics Module"])
+def read_departments_above_average(db: Session = Depends(get_db)):
+    # DBMS-criteria showcase: COUNT + AVG with GROUP BY + HAVING (nested subquery).
+    try:
+        return crud.get_departments_above_average_projects(db=db) or {}
     except Exception as e:
         logger.exception('statistics error: %s', e)
         return {}

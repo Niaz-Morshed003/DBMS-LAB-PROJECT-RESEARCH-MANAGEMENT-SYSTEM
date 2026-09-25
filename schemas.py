@@ -110,6 +110,14 @@ class AdminStudentEditRequest(BaseModel):
     skills: Optional[List[str]] = None
     interests: Optional[List[str]] = None
 
+class AdminProjectEditRequest(BaseModel):
+    """Admin proposes research-project edits. Nothing is applied directly —
+    the owning faculty must Accept first (mirrors AdminFacultyEditRequest)."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    required_skill: Optional[str] = None
+    status: Optional[str] = None
+
 class ResearchProjectCreate(BaseModel):
     title: str
     description: Optional[str] = None

@@ -910,6 +910,177 @@ def send_admin_notice_email(to_email: str, title: str, intro: str,
     return email_sent
 
 
+# ---------------------------------------------------------------------------
+# Detailed change-request emails (Phase-1: approval/rejection transparency)
+# ---------------------------------------------------------------------------
+# Generic helper: sends an "old -> new" change table to a student/faculty so
+# that every approval AND every rejection carries its full detail, both in the
+# in-app notification payload and in email. Purely additive — no existing
+# sender is modified.
+_CHANGE_FIELD_LABELS = {
+    "name": "Name",
+    "email": "Email",
+    "designation": "Designation",
+    "department": "Department",
+    "office_hours": "Office Hours",
+    "research_areas": "Research Areas",
+    "cgpa": "CGPA",
+    "semester": "Semester",
+    "github_link": "GitHub Link",
+    "cv_link": "CV Link",
+    "skills": "Skills",
+    "interests": "Research Interests",
+    "title": "Project Title",
+    "description": "Description",
+    "required_skill": "Required Skill",
+    "status": "Status",
+}
+
+
+def _change_lines(changes):
+    """Normalize {field: {'old':.., 'new':..} | value} -> [(label, old, new)]."""
+    lines = []
+    try:
+        items = list(changes.items()) if isinstance(changes, dict) else []
+    except Exception:
+        return lines
+    for field, val in items:
+        try:
+            label = _CHANGE_FIELD_LABELS.get(str(field).lower(),
+                                             str(field).replace("_", " ").title())
+        except Exception:
+            label = str(field)
+        if isinstance(val, dict) and ("old" in val or "new" in val):
+            old, new = val.get("old"), val.get("new")
+        else:
+            old, new = "—", val
+        try:
+            if isinstance(old, list):
+                old = ", ".join(str(x) for x in old) if old else "—"
+            if isinstance(new, list):
+                new = ", ".join(str(x) for x in new) if new else "—"
+            old = str(old).strip() if old is not None else "—"
+            new = str(new).strip() if new is not None else "—"
+            if old == "":
+                old = "—"
+            if new == "":
+                new = "—"
+        except Exception:
+            old, new = "—", "—"
+        lines.append((label, old, new))
+    return lines
+
+
+def send_change_detail_email(to_email: str, subject: str, greeting_name=None,
+                             role_label: str = "", intro: str = "",
+                             changes=None, closing: str = "", tone: str = "info"):
+    """Detailed approval/rejection email with an old->new change table.
+
+    tone: 'success' (green), 'danger' (red) or 'info' (blue).
+    """
+    if not to_email:
+        return False
+    load_env_config()
+    sender_email = os.environ.get("GMAIL_SENDER_EMAIL", "").strip()
+    sender_password = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "").strip()
+
+    colors = {
+        "success": ("#16a34a", "#f0fdf4", "#bbf7d0", "#166534"),
+        "danger": ("#dc2626", "#fef2f2", "#fecaca", "#991b1b"),
+    }
+    title_color, box_bg, box_bd, box_text = colors.get(
+        tone, ("#1d4ed8", "#eff6ff", "#bfdbfe", "#1e40af"))
+
+    def _esc(v):
+        return str(v if v is not None else "—").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    try:
+        role_bit = f" ({role_label})" if str(role_label or "").strip() else ""
+        salutation = f"Dear {greeting_name}," if greeting_name else f"Dear User{role_bit},"
+    except Exception:
+        salutation = "Dear User,"
+
+    rows = _change_lines(changes or {})
+    detail_html = "".join([
+        f"""<div style="font-size: 13px; padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+            <div style="color: #0f172a; font-weight: 700; margin-bottom: 4px;">{_esc(k)}</div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <span style="background-color: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 6px; padding: 3px 10px; font-size: 12px;">Old: {_esc(o)}</span>
+                <span style="color: #64748b; font-weight: 700;">→</span>
+                <span style="background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 6px; padding: 3px 10px; font-size: 12px;">New: {_esc(n)}</span>
+            </div>
+        </div>""" for k, o, n in rows
+    ])
+    detail_plain = "\n".join([f"{k}: Old: {o} -> New: {n}" for k, o, n in rows])
+    next_box = ""
+    if closing:
+        next_box = f"""
+        <div style="background-color: {box_bg}; border: 1px solid {box_bd}; border-radius: 8px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 13px; color: {box_text};">{_esc(closing)}</p>
+        </div>
+        """
+
+    plain_text = (
+        f"{salutation}\n\n"
+        f"{intro}\n\n"
+        + (f"{detail_plain}\n\n" if detail_plain else "")
+        + (f"{closing}\n\n" if closing else "") +
+        f"Best regards,\n"
+        f"Research Management Portal\n"
+        f"United International University"
+    )
+    html_content = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1e293b;">
+        <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
+            <h1 style="color: #1e3a8a; margin: 0; font-size: 22px; font-weight: 700;">United International University</h1>
+            <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">Research Management Portal</p>
+        </div>
+        <h2 style="color: {title_color}; margin: 0 0 16px 0; font-size: 20px;">{_esc(subject)}</h2>
+        <p style="font-size: 15px; margin-bottom: 12px;">{_esc(salutation)}</p>
+        <p style="font-size: 14px; color: #334155; line-height: 1.6;">{_esc(intro)}</p>
+        {"<div style='background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 16px; margin: 20px 0;'>" + detail_html + "</div>" if detail_html else ""}
+        {next_box}
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;">
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">Sent by Research Management Portal to {to_email}</p>
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 8px 0 0 0;">United International University, Dhaka, Bangladesh</p>
+    </div>
+    """
+
+    email_sent = False
+    if sender_email and sender_password and mail_sending_enabled():
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"United International University Research Portal <{sender_email}>"
+            msg["To"] = to_email
+            msg["Reply-To"] = sender_email
+            msg["Return-Path"] = sender_email
+            msg["Date"] = formatdate(localtime=True)
+            msg["Message-ID"] = make_msgid(domain=sender_email.split("@")[-1] if "@" in sender_email else "gmail.com")
+            msg["X-Mailer"] = "ResearchPortalAuth/2.2"
+            msg["MIME-Version"] = "1.0"
+            msg["Precedence"] = "bulk"
+            msg["List-Unsubscribe"] = f"<mailto:{sender_email}?subject=unsubscribe>, <https://uiu.ac.bd/unsubscribe>"
+            msg["Auto-Submitted"] = "auto-generated"
+
+            msg.attach(MIMEText(plain_text, "plain"))
+            msg.attach(MIMEText(html_content, "html"))
+
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
+                server.starttls()
+                server.login(sender_email, sender_password)
+                server.sendmail(sender_email, [to_email], msg.as_string())
+            email_sent = True
+        except Exception as e:
+            print(f"[CHANGE DETAIL EMAIL ERROR] Failed to send '{subject}' to {to_email}: {e}")
+
+    print(f"\n==================================================")
+    print(f"[CHANGE DETAIL EMAIL] '{subject}' for {to_email}")
+    print(f"Status: {'Sent successfully via Gmail' if email_sent else 'Printed to console (Configure GMAIL_SENDER_EMAIL & GMAIL_APP_PASSWORD in .env for real Gmail delivery)'}")
+    print(f"==================================================\n")
+    return email_sent
+
+
 def _email_response_to_originator(db: Session, notification_id, notif_type: str,
                                   responder_label: str, decision: str, summary: str):
     """Email a faculty/student Yes-No response to the originating admin only.
@@ -939,9 +1110,105 @@ def _email_response_to_originator(db: Session, notification_id, notif_type: str,
                     tone=("success" if accepted else "danger"))
             except Exception:
                 pass
+            # NEW (Phase-2): in-app feedback notification for the handling admin,
+            # so the response is visible inside the portal as well (not only by email).
+            # Status mirrors the decision; it never enters any Pending queue.
+            try:
+                _fb_payload = json.dumps({
+                    "message": (f"{responder_label} has {('accepted' if accepted else 'rejected')} "
+                                f"your proposal ({notif_type}, request #{notification_id})."),
+                    "admin_id": int(_aid),
+                    "responder": responder_label,
+                    "decision": "Accepted" if accepted else "Rejected",
+                    "request_type": notif_type,
+                    "request_id": int(notification_id),
+                    "details": summary or "—",
+                })
+                try:
+                    db.execute(text("INSERT INTO notification (faculty_id, student_id, type, payload, status)"
+                                    " VALUES (NULL, NULL, 'ProposalResponse', :p, :s)"),
+                               {"p": _fb_payload, "s": "Accepted" if accepted else "Rejected"})
+                except Exception:
+                    db.rollback()
+                    db.execute(text("INSERT INTO notification (faculty_id, type, payload, status)"
+                                    " VALUES (NULL, 'ProposalResponse', :p, :s)"),
+                               {"p": _fb_payload, "s": "Accepted" if accepted else "Rejected"})
+                db.commit()
+            except Exception:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
         return True
     except Exception:
         return False
+
+
+def get_admin_responses(db: Session, admin_id: int):
+    """Feedback notifications for the handling admin (Phase-2).
+
+    Returns 'ProposalResponse' rows addressed (via payload admin_id) to this
+    admin, newest first. Read-only; never touches other admins' rows.
+    """
+    try:
+        _aid = int(admin_id)
+    except (TypeError, ValueError):
+        raise ValueError("Invalid admin id")
+    try:
+        rows = db.execute(text("SELECT notification_id, faculty_id, type, payload, status"
+                               " FROM notification WHERE type = 'ProposalResponse'"
+                               " ORDER BY notification_id DESC LIMIT 200")).fetchall()
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        try:
+            data = json.loads(r.payload) if r.payload else {}
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        try:
+            if int(data.get("admin_id", -1)) != _aid:
+                continue
+        except Exception:
+            continue
+        out.append({
+            "notification_id": r.notification_id,
+            "faculty_id": r.faculty_id,
+            "type": r.type,
+            "payload": r.payload,
+            "status": r.status,
+            "faculty_name": None,
+        })
+    return out
+
+
+def ack_admin_response(db: Session, notification_id: int, admin_id: int):
+    """Acknowledge one ProposalResponse row. Only the addressed admin may ack."""
+    try:
+        _aid = int(admin_id)
+    except (TypeError, ValueError):
+        raise ValueError("Invalid admin id")
+    row = db.execute(text("SELECT notification_id, type, payload, status FROM notification"
+                          " WHERE notification_id = :nid"), {"nid": notification_id}).fetchone()
+    if not row or str(getattr(row, "type", "")) != "ProposalResponse":
+        raise ValueError("Notification not found")
+    try:
+        data = json.loads(row.payload) if row.payload else {}
+    except Exception:
+        data = {}
+    try:
+        if int(data.get("admin_id", -1)) != _aid:
+            raise ValueError("This response is not addressed to you")
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError("This response is not addressed to you")
+    db.execute(text("UPDATE notification SET status = 'Acknowledged' WHERE notification_id = :nid"),
+               {"nid": notification_id})
+    db.commit()
+    return {"message": "Response acknowledged"}
 
 
 def send_new_application_email(to_email: str, faculty_name: str, project_title: str,
@@ -1491,6 +1758,23 @@ def request_faculty_edit_by_admin(db: Session, faculty_id: int, edit: schemas.Ad
         db.commit()
     except Exception:
         pass
+    # NEW: email the faculty that the administration proposed these edits.
+    try:
+        _pfe_email = (current.get("email") or "")
+        _pfe_name = current.get("name")
+        if _pfe_email:
+            send_change_detail_email(
+                to_email=_pfe_email,
+                subject="The administration proposed updates to your profile",
+                greeting_name=_pfe_name, role_label="Faculty",
+                intro=("The administration wants to bring the following particular changes to your faculty profile. "
+                       "Nothing has changed yet — please log in to the system now and deal with it with a Yes or a No "
+                       "from your Notification Hub."),
+                changes=changes,
+                closing="Log in and open your Notification Hub to accept or reject. If you choose No, your profile stays exactly as it is.",
+                tone="info")
+    except Exception:
+        pass
     return {"message": "Edit request sent to the faculty member for approval."}
 
 def get_all_students(db: Session):
@@ -1561,7 +1845,110 @@ def request_student_edit_by_admin(db: Session, student_id: int, edit: schemas.Ad
         db.commit()
     except Exception:
         pass
+    # NEW (Phase-1): email the student that the administration proposed these edits.
+    try:
+        _pse_email = (current.get("email") or "")
+        _pse_name = current.get("name")
+        if _pse_email:
+            send_change_detail_email(
+                to_email=_pse_email,
+                subject="The administration proposed updates to your profile",
+                greeting_name=_pse_name, role_label="Student",
+                intro=("The administration has proposed the following updates to your student profile. "
+                       "Nothing has changed yet — please open your Notification Hub and accept or reject "
+                       "the proposal."),
+                changes=changes,
+                closing="Open your Notification Hub to accept or reject. If you reject, your profile stays exactly as it is.",
+                tone="info")
+    except Exception:
+        pass
     return {"message": "Edit request sent to the student for approval."}
+
+def request_project_edit_by_admin(db: Session, project_id: int, edit, actor_id=None):
+    """Admin proposes research-project edits (Phase-2 new feature).
+
+    Nothing is written to research_project here. A notification
+    (type 'AdminProjectEditRequest', status 'Pending') is delivered to the
+    owning faculty's hub plus a detailed email; the change is applied only
+    when the faculty Accepts (see handle_faculty_notification_response).
+    Callable from anywhere a project is visible (lists, search, detail).
+    """
+    proj = get_project_by_id(db=db, project_id=project_id)
+    if not proj:
+        raise ValueError("Project not found")
+    owner_fid = proj.get("faculty_id")
+
+    changes = {}
+    if edit.title is not None and edit.title != proj.get("title"):
+        changes["title"] = {"old": proj.get("title"), "new": edit.title}
+    if edit.description is not None and (edit.description or "") != (proj.get("description") or ""):
+        changes["description"] = {"old": proj.get("description"), "new": edit.description}
+    if edit.required_skill is not None and (edit.required_skill or "") != (proj.get("required_skill") or ""):
+        changes["required_skill"] = {"old": proj.get("required_skill"), "new": edit.required_skill}
+    if edit.status is not None and edit.status != proj.get("status"):
+        changes["status"] = {"old": proj.get("status"), "new": edit.status}
+
+    if not changes:
+        raise ValueError("No changes were detected to propose")
+
+    # Idempotency guard: the exact same proposal (same project + identical
+    # changes) already pending with the faculty must not be inserted twice
+    # (e.g. double-click on Send while the first request is still in flight).
+    try:
+        _dupes = db.execute(text("SELECT payload FROM notification WHERE faculty_id = :f"
+                                 " AND type = 'AdminProjectEditRequest' AND status = 'Pending'"
+                                 " ORDER BY notification_id DESC LIMIT 20"),
+                            {"f": owner_fid}).fetchall()
+        for _d in _dupes:
+            try:
+                _dp = json.loads(_d.payload)
+            except Exception:
+                continue
+            if (isinstance(_dp, dict)
+                    and str(_dp.get("project_id", -1)) == str(project_id)
+                    and (_dp.get("changes") or {}) == changes):
+                raise ValueError("This exact proposal is already pending with the faculty. Please wait for their response instead of sending it again.")
+    except ValueError:
+        raise
+    except Exception:
+        pass
+
+    payload = json.dumps({
+        "message": "The administration has proposed updates to your research project.",
+        "project_id": project_id,
+        "project_title": proj.get("title"),
+        "changes": changes
+    })
+    db.execute(text("INSERT INTO notification (faculty_id, type, payload, status) VALUES (:fid, 'AdminProjectEditRequest', :payload, 'Pending')"),
+               {"fid": owner_fid, "payload": payload})
+    db.commit()
+    try:
+        new_nid = db.execute(text("SELECT notification_id FROM notification WHERE faculty_id = :f AND type = 'AdminProjectEditRequest' ORDER BY notification_id DESC LIMIT 1"), {"f": owner_fid}).fetchone()
+        _log_admin_activity(db, actor_id, "propose_project_edit",
+                            notification_id=int(new_nid.notification_id) if new_nid else None,
+                            notification_type="AdminProjectEditRequest",
+                            detail=f"Proposed project edit for project {project_id} ('{proj.get('title')}'): " + "; ".join([f"{k}: {v.get('old')} → {v.get('new')}" for k, v in (changes or {}).items()]),
+                            snapshot={"project_id": project_id, "changes": changes})
+        db.commit()
+    except Exception:
+        pass
+    # Detailed email to the owning faculty (mirrors the student/faculty proposal emails).
+    try:
+        _pje_name, _pje_email = _faculty_contact(db, owner_fid)
+        if _pje_email:
+            send_change_detail_email(
+                to_email=_pje_email,
+                subject=f"The administration proposed updates to your project '{proj.get('title')}'",
+                greeting_name=_pje_name, role_label="Faculty",
+                intro=("The administration has proposed the following updates to your research project "
+                       f"'{proj.get('title')}' (ID {project_id}). Nothing has changed yet — please open "
+                       "your Notification Hub and accept or reject the proposal."),
+                changes=changes,
+                closing="Open your Notification Hub to accept or reject. If you reject, the project stays exactly as it is.",
+                tone="info")
+    except Exception:
+        pass
+    return {"message": "Edit request sent to the faculty member for approval."}
 
 def handle_faculty_notification_response(db: Session, notification_id: int, faculty_id: int, action: str):
     notif_q = text("SELECT notification_id, faculty_id, type, payload, status FROM notification WHERE notification_id = :notification_id")
@@ -1572,6 +1959,7 @@ def handle_faculty_notification_response(db: Session, notification_id: int, facu
         raise ValueError("This notification does not belong to you")
     if notif.type not in (
         "AdminFacultyEditRequest",
+        "AdminProjectEditRequest",
         "DesignationChange",
         "ProjectCreation",
         "ProjectCreationResult",
@@ -1663,12 +2051,49 @@ def handle_faculty_notification_response(db: Session, notification_id: int, facu
                 "status": payload_data.get("status") or "Active"
             })
 
+    elif notif.type == "AdminProjectEditRequest":
+        # Phase-2 new feature: admin-proposed project edits apply ONLY on faculty Accept.
+        if notif.status != "Pending":
+            raise ValueError("This notification has already been handled")
+        try:
+            _pd = json.loads(notif.payload)
+            if not isinstance(_pd, dict):
+                _pd = {}
+        except Exception:
+            _pd = {}
+        if new_status == "Accepted":
+            _changes = _pd.get("changes", {}) or {}
+            _pid = _pd.get("project_id")
+            try:
+                _pid = int(_pid) if _pid is not None else None
+            except Exception:
+                _pid = None
+            if _pid is None:
+                raise ValueError("This proposal has no valid project reference")
+            _owner = db.execute(text("SELECT faculty_id FROM research_project WHERE project_id = :p"),
+                                {"p": _pid}).fetchone()
+            if not _owner:
+                raise ValueError("The project no longer exists")
+            if int(_owner.faculty_id) != int(faculty_id):
+                raise ValueError("This project is no longer under your supervision")
+            _vals = {}
+            for _field in ("title", "description", "required_skill", "status"):
+                if _field in _changes:
+                    try:
+                        _vals[_field] = _changes[_field].get("new")
+                    except Exception:
+                        _vals[_field] = None
+            if _vals:
+                _sets = ", ".join([f"{_k} = :{_k}" for _k in _vals.keys()])
+                _vals["p"] = _pid
+                db.execute(text(f"UPDATE research_project SET {_sets} WHERE project_id = :p"), _vals)
+
     up_q = text("UPDATE notification SET status = :status WHERE notification_id = :notification_id")
     db.execute(up_q, {"status": new_status, "notification_id": notification_id})
     db.commit()
     # Tell the originating admin (and only them) how the faculty responded.
     try:
-        if notif.type in ("AdminFacultyEditRequest", "DesignationChange", "ProjectCreation"):
+        if notif.type in ("AdminFacultyEditRequest", "AdminProjectEditRequest", "DesignationChange", "ProjectCreation"):
             try:
                 _pd = json.loads(notif.payload)
                 if not isinstance(_pd, dict):
@@ -1678,6 +2103,11 @@ def handle_faculty_notification_response(db: Session, notification_id: int, facu
             if notif.type == "AdminFacultyEditRequest":
                 _summary = "; ".join([f"{k}: {v.get('old')} → {v.get('new')}"
                                       for k, v in ((_pd.get("changes") or {}).items())]) or "Profile update proposal"
+            elif notif.type == "AdminProjectEditRequest":
+                _summary = (f"Project '{_pd.get('project_title') or _pd.get('project_id') or '—'}' edit: "
+                            + ("; ".join([f"{k}: {v.get('old')} → {v.get('new')}"
+                                           for k, v in ((_pd.get("changes") or {}).items())])
+                               or "project update proposal"))
             elif notif.type == "DesignationChange":
                 _summary = f"Designation → {_pd.get('new_designation') or '—'}"
             else:
@@ -2407,6 +2837,64 @@ def get_active_projects_by_department(db: Session, department: str):
         for r in res
     ]
 
+def get_departments_above_average_projects(db: Session):
+    """Departments whose running-project count is ABOVE the per-department average.
+
+    Math: total_running_projects (whole system, Active only) / total_departments
+    = average_benchmark (running projects per department). Every department with
+    strictly more running projects than that average is listed.
+    Computed live on each call, so the numbers rise/fall as projects are
+    added/removed anywhere in the system.
+
+    DBMS-criteria showcase: two aggregate functions (COUNT + AVG) with
+    GROUP BY and HAVING, plus a nested subquery. Used by the Statistics Hub
+    ("Departments Above Average" button). Read-only; touches nothing else.
+    """
+    query = text("""
+        SELECT
+            f.department AS department,
+            COUNT(DISTINCT f.faculty_id) AS faculty_count,
+            COUNT(CASE WHEN rp.status = 'Active' THEN 1 END) AS running_projects
+        FROM faculty f
+        LEFT JOIN research_project rp ON f.faculty_id = rp.faculty_id
+        GROUP BY f.department
+        HAVING COUNT(CASE WHEN rp.status = 'Active' THEN 1 END) > (
+            SELECT AVG(dept_running) FROM (
+                SELECT COUNT(CASE WHEN rp2.status = 'Active' THEN 1 END) AS dept_running
+                FROM faculty f2
+                LEFT JOIN research_project rp2 ON f2.faculty_id = rp2.faculty_id
+                GROUP BY f2.department
+            ) AS dept_avg
+        )
+        ORDER BY running_projects DESC
+    """)
+    res = db.execute(query).fetchall()
+    above = [
+        {
+            "department": r.department,
+            "faculty_count": r.faculty_count,
+            "running_projects": r.running_projects,
+        }
+        for r in res
+    ]
+    # Overall maths for the reasoning box in the UI.
+    totals = db.execute(text("""
+        SELECT
+            COUNT(CASE WHEN rp.status = 'Active' THEN 1 END) AS total_running,
+            COUNT(DISTINCT f.department) AS total_departments
+        FROM faculty f
+        LEFT JOIN research_project rp ON f.faculty_id = rp.faculty_id
+    """)).fetchone()
+    total_running = int(totals.total_running or 0) if totals else 0
+    total_departments = int(totals.total_departments or 0) if totals else 0
+    average = round(total_running / total_departments, 1) if total_departments else 0.0
+    return {
+        "total_running_projects": total_running,
+        "total_departments": total_departments,
+        "average_benchmark": average,
+        "above_average_departments": above,
+    }
+
 def request_admin_signup(db: Session, admin: schemas.AdminCreate):
     check_query = text("SELECT user_id FROM user WHERE email = :email")
     existing = db.execute(check_query, {"email": admin.email}).fetchone()
@@ -2462,7 +2950,7 @@ def request_faculty_signup(db: Session, faculty: schemas.FacultyCreate):
 
 def get_pending_notifications(db: Session):
     _ensure_student_schema(db)
-    query = text("SELECT notification_id, faculty_id, type, payload, status FROM notification WHERE status = 'Pending' AND type != 'AdminFacultyEditRequest' AND type NOT IN ('ProjectCreationResult', 'ProjectDeletionResult', 'AccountDeletionResult', 'DesignationChangeResult', 'StudentProfileChangeResult', 'StudentAccountDeletionResult', 'ApplicationDecision', 'ProjectApplication', 'AdminActivity', 'SuperAdminAction')")
+    query = text("SELECT notification_id, faculty_id, type, payload, status FROM notification WHERE status = 'Pending' AND type != 'AdminFacultyEditRequest' AND type != 'AdminProjectEditRequest' AND type NOT IN ('ProjectCreationResult', 'ProjectDeletionResult', 'AccountDeletionResult', 'DesignationChangeResult', 'StudentProfileChangeResult', 'StudentAccountDeletionResult', 'ApplicationDecision', 'ProjectApplication', 'ProposalResponse', 'AdminActivity', 'SuperAdminAction')")
     res = db.execute(query).fetchall()
     result = []
     for r in res:
@@ -2538,46 +3026,123 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
                       "type": getattr(notif, "type", None),
                       "payload": _orig_payload}
 
-    def _mirror(detail: str):
+    def _mirror(detail: str, extra=None):
+        # extra: extra snapshot fields captured at handling time (e.g. contact
+        # details BEFORE a destructive delete, exact old values). Merged into
+        # the permanent superadmin record so the audit popup stays detailed
+        # even after rows are gone.
         try:
+            _snap = dict(_orig_snapshot) if isinstance(_orig_snapshot, dict) else {}
+            if isinstance(extra, dict):
+                _snap.update(extra)
             _log_admin_activity(db, actor_id, f"{str(getattr(notif, 'type', 'notification')).lower()}_{new_status.lower()}",
                                 notification_id=int(notification_id),
                                 notification_type=str(getattr(notif, "type", "")),
                                 detail=detail,
-                                snapshot=_orig_snapshot)
+                                snapshot=_snap)
         except Exception:
             pass
 
     if notif.type == "AccountDeletion":
+        try:
+            _fad_name, _fad_email = _faculty_contact(db, notif.faculty_id)
+        except Exception:
+            _fad_name, _fad_email = None, ""
         if new_status == "Accepted":
             del_q = text("DELETE FROM user WHERE user_id = :faculty_id")
             db.execute(del_q, {"faculty_id": notif.faculty_id})
-            _mirror(f"Faculty account deletion request {new_status.lower()} (faculty {notif.faculty_id}).")
+            _mirror(f"Faculty account deletion request {new_status.lower()} (faculty {notif.faculty_id}).",
+                    extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                           "target_name": _fad_name, "target_email": _fad_email})
             db.commit()
             try:
                 _remove_credentials_json(notif.faculty_id)
             except Exception:
                 pass
+            # NEW (Phase-1): inform the address on record that the deletion was carried out.
+            try:
+                if _fad_email:
+                    send_change_detail_email(
+                        to_email=_fad_email,
+                        subject="Your account deletion request was approved",
+                        greeting_name=_fad_name, role_label="Faculty",
+                        intro=("The administration has approved your account deletion request. "
+                               "Your Research Management Portal faculty account has now been permanently "
+                               "removed along with all related data."),
+                        changes={},
+                        closing="If you believe this was a mistake, please contact the portal administration.",
+                        tone="info")
+            except Exception:
+                pass
             return {"message": "Faculty account deleted."}
         else:
             result_payload = json.dumps({
-                "message": "Your account deletion request has been reviewed by the administration.",
+                "message": "Your account deletion request has been reviewed by the administration and was rejected. Your account remains active and unchanged.",
                 "outcome": "rejected"
             })
             result_notif_q = text("INSERT INTO notification (faculty_id, type, payload, status) VALUES (:faculty_id, 'AccountDeletionResult', :payload, 'Pending')")
             db.execute(result_notif_q, {"faculty_id": notif.faculty_id, "payload": result_payload})
             up_q = text("UPDATE notification SET status = 'Rejected' WHERE notification_id = :notification_id")
             db.execute(up_q, {"notification_id": notification_id})
-            _mirror(f"Faculty account deletion request {new_status.lower()} (faculty {notif.faculty_id}).")
+            _mirror(f"Faculty account deletion request {new_status.lower()} (faculty {notif.faculty_id}).",
+                    extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                           "target_name": _fad_name, "target_email": _fad_email})
             db.commit()
+            # NEW (Phase-1): detailed rejection email.
+            try:
+                if _fad_email:
+                    send_change_detail_email(
+                        to_email=_fad_email,
+                        subject="Your account deletion request was rejected",
+                        greeting_name=_fad_name, role_label="Faculty",
+                        intro=("After review, the administration has rejected your account deletion request. "
+                               "Your faculty account remains active and unchanged."),
+                        changes={},
+                        closing="A matching notification is waiting in your Notification Hub.",
+                        tone="danger")
+            except Exception:
+                pass
             return {"message": "Account deletion request rejected. Faculty has been notified."}
 
     if notif.type == "DesignationChange":
+        try:
+            _dsg_payload = json.loads(notif.payload) if notif.payload else {}
+        except (ValueError, TypeError):
+            _dsg_payload = {}
+        _dsg_new = _dsg_payload.get("new_designation") if isinstance(_dsg_payload, dict) else None
+        try:
+            _dsg_old_row = db.execute(text("SELECT designation FROM faculty WHERE faculty_id = :f"), {"f": notif.faculty_id}).fetchone()
+            _dsg_old = _dsg_old_row.designation if _dsg_old_row else None
+        except Exception:
+            _dsg_old = None
+        _dsg_changes = {"designation": {"old": _dsg_old, "new": _dsg_new}}
+        try:
+            _dsg_name, _dsg_email = _faculty_contact(db, notif.faculty_id)
+        except Exception:
+            _dsg_name, _dsg_email = None, ""
         if new_status == "Accepted":
             up_q = text("UPDATE notification SET status = 'AwaitingFacultyConfirmation' WHERE notification_id = :notification_id")
             db.execute(up_q, {"notification_id": notification_id})
-            _mirror(f"Designation change request {new_status.lower()} (faculty {notif.faculty_id}).")
+            _mirror(f"Designation change request {new_status.lower()} (faculty {notif.faculty_id}).",
+                    extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                           "target_name": _dsg_name, "target_email": _dsg_email,
+                           "old_designation": _dsg_old, "new_designation": _dsg_new})
             db.commit()
+            # NEW (Phase-1): detailed email — admin approved, now the faculty's turn to say Yes/No.
+            try:
+                if _dsg_email:
+                    send_change_detail_email(
+                        to_email=_dsg_email,
+                        subject="Your designation change was approved — your confirmation needed",
+                        greeting_name=_dsg_name, role_label="Faculty",
+                        intro=("The administration has approved your designation change request with the "
+                               "details below. Nothing has changed yet — please open your Notification Hub "
+                               "and confirm with Yes (apply the change) or No (keep your current designation)."),
+                        changes=_dsg_changes,
+                        closing="Open your Notification Hub to confirm. If you choose No, your designation stays exactly as it is.",
+                        tone="success")
+            except Exception:
+                pass
             return {"message": "Approved. Awaiting the faculty member's final confirmation before the change is applied."}
         else:
             try:
@@ -2585,16 +3150,34 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
             except (ValueError, TypeError):
                 payload_data = {}
             result_payload = json.dumps({
-                "message": "Your designation change request has been reviewed by the administration.",
+                "message": "Your designation change request has been reviewed by the administration and was rejected. The exact rejected request is detailed below.",
                 "outcome": "rejected",
-                "new_designation": payload_data.get("new_designation")
+                "new_designation": payload_data.get("new_designation"),
+                "changes": _dsg_changes
             })
             result_notif_q = text("INSERT INTO notification (faculty_id, type, payload, status) VALUES (:faculty_id, 'DesignationChangeResult', :payload, 'Pending')")
             db.execute(result_notif_q, {"faculty_id": notif.faculty_id, "payload": result_payload})
             up_q = text("UPDATE notification SET status = 'Rejected' WHERE notification_id = :notification_id")
             db.execute(up_q, {"notification_id": notification_id})
-            _mirror(f"Designation change request {new_status.lower()} (faculty {notif.faculty_id}).")
+            _mirror(f"Designation change request {new_status.lower()} (faculty {notif.faculty_id}).",
+                    extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                           "target_name": _dsg_name, "target_email": _dsg_email,
+                           "old_designation": _dsg_old, "new_designation": _dsg_new})
             db.commit()
+            # NEW (Phase-1): detailed rejection email naming the exact rejected request.
+            try:
+                if _dsg_email:
+                    send_change_detail_email(
+                        to_email=_dsg_email,
+                        subject="Your designation change request was rejected",
+                        greeting_name=_dsg_name, role_label="Faculty",
+                        intro=("After review, the administration has rejected your designation change request. "
+                               "The exact request that was rejected is detailed below. Your designation remains unchanged."),
+                        changes=_dsg_changes,
+                        closing="If you need clarification, please contact the portal administration. A matching notification is waiting in your Notification Hub.",
+                        tone="danger")
+            except Exception:
+                pass
             return {"message": "Designation change request rejected. Faculty has been notified."}
 
     if notif.type == "ProjectCreation":
@@ -2602,10 +3185,16 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
             creation_req = json.loads(notif.payload)
         except (ValueError, TypeError):
             creation_req = {}
+        try:
+            _pc_name, _pc_email = _faculty_contact(db, notif.faculty_id)
+        except Exception:
+            _pc_name, _pc_email = None, ""
         if new_status == "Accepted":
             up_q = text("UPDATE notification SET status = 'AwaitingFacultyConfirmation' WHERE notification_id = :notification_id")
             db.execute(up_q, {"notification_id": notification_id})
-            _mirror(f"Project creation request {new_status.lower()} (faculty {notif.faculty_id}).")
+            _mirror(f"Project creation request {new_status.lower()} (faculty {notif.faculty_id}).",
+                    extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                           "target_name": _pc_name, "target_email": _pc_email})
             db.commit()
             try:
                 _fname, _femail = _faculty_contact(db, notif.faculty_id)
@@ -2633,7 +3222,9 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
             db.execute(result_notif_q, {"faculty_id": notif.faculty_id, "payload": result_payload})
             up_q = text("UPDATE notification SET status = 'Rejected' WHERE notification_id = :notification_id")
             db.execute(up_q, {"notification_id": notification_id})
-            _mirror(f"Project creation request {new_status.lower()} (faculty {notif.faculty_id}).")
+            _mirror(f"Project creation request {new_status.lower()} (faculty {notif.faculty_id}).",
+                    extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                           "target_name": _pc_name, "target_email": _pc_email})
             db.commit()
             try:
                 _fname, _femail = _faculty_contact(db, notif.faculty_id)
@@ -2668,7 +3259,14 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
         })
         result_notif_q = text("INSERT INTO notification (faculty_id, type, payload, status) VALUES (:faculty_id, 'ProjectDeletionResult', :payload, 'Pending')")
         db.execute(result_notif_q, {"faculty_id": notif.faculty_id, "payload": result_payload})
-        _mirror(f"Project deletion request {new_status.lower()} for project '{project_title}' (faculty {notif.faculty_id}). Original request preserved in superadmin record.")
+        try:
+            _pdel_name, _pdel_email = _faculty_contact(db, notif.faculty_id)
+        except Exception:
+            _pdel_name, _pdel_email = None, ""
+        _mirror(f"Project deletion request {new_status.lower()} for project '{project_title}' (faculty {notif.faculty_id}). Original request preserved in superadmin record.",
+                extra={"target_id": notif.faculty_id, "target_kind": "faculty",
+                       "target_name": _pdel_name, "target_email": _pdel_email,
+                       "project_id": pid, "project_title": project_title})
         del_notif_q = text("DELETE FROM notification WHERE notification_id = :notification_id")
         db.execute(del_notif_q, {"notification_id": notification_id})
         db.commit()
@@ -2786,29 +3384,71 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
         return {"message": f"Notification {new_status}"}
 
     if notif.type == "StudentProfileChange":
+        try:
+            _spc_payload = json.loads(notif.payload) if notif.payload else {}
+            _spc_changes = _spc_payload.get("changes", {}) if isinstance(_spc_payload, dict) else {}
+        except Exception:
+            _spc_changes = {}
+        try:
+            _spc_tmp = db.execute(text("SELECT student_id FROM notification WHERE notification_id = :nid"), {"nid": notification_id}).fetchone()
+            _spc_sid = int(_spc_tmp.student_id) if _spc_tmp and _spc_tmp.student_id else None
+        except Exception:
+            _spc_sid = None
+        try:
+            _spc_name, _spc_email = _student_contact(db, _spc_sid) if _spc_sid else (None, "")
+        except Exception:
+            _spc_name, _spc_email = None, ""
         if new_status == "Accepted":
             db.execute(text("UPDATE notification SET status = 'AwaitingStudentConfirmation' WHERE notification_id = :nid"), {"nid": notification_id})
-            _mirror("Student profile change request accepted; awaiting student confirmation.")
+            _mirror("Student profile change request accepted; awaiting student confirmation.",
+                    extra={"target_id": _spc_sid, "target_kind": "student",
+                           "target_name": _spc_name, "target_email": _spc_email})
             db.commit()
+            # NEW (Phase-1): detailed email — admin approved, now the student's turn to say Yes/No.
+            try:
+                if _spc_email:
+                    send_change_detail_email(
+                        to_email=_spc_email,
+                        subject="Your profile change request was approved — your confirmation needed",
+                        greeting_name=_spc_name, role_label="Student",
+                        intro=("The administration has approved your profile change request with the "
+                               "details below. Nothing has changed yet — please open your Notification Hub "
+                               "and confirm with Yes (apply the changes) or No (keep your profile unchanged)."),
+                        changes=_spc_changes,
+                        closing="Open your Notification Hub to confirm. If you choose No, your profile stays exactly as it is.",
+                        tone="success")
+            except Exception:
+                pass
             return {"message": "Approved. Awaiting the student's final confirmation."}
         else:
-            # notify student of rejection
+            # notify student of rejection — now WITH full detail + email (Phase-1)
             try:
-                sid = None
-                try:
-                    tmp = db.execute(text("SELECT student_id FROM notification WHERE notification_id = :nid"), {"nid": notification_id}).fetchone()
-                    sid = int(tmp.student_id) if tmp and tmp.student_id else None
-                except Exception:
-                    sid = None
+                sid = _spc_sid
                 if sid:
-                    db.execute(text("INSERT INTO notification (faculty_id, student_id, type, payload, status) VALUES (NULL, :sid, 'StudentProfileChangeResult', :p, 'Pending')"), {"sid": sid, "p": json.dumps({"message": "Your profile change request was rejected.", "outcome": "rejected"})})
+                    db.execute(text("INSERT INTO notification (faculty_id, student_id, type, payload, status) VALUES (NULL, :sid, 'StudentProfileChangeResult', :p, 'Pending')"), {"sid": sid, "p": json.dumps({"message": "Your profile change request was reviewed by the administration and was rejected. The details of the rejected request are below.", "outcome": "rejected", "changes": _spc_changes})})
                 else:
-                    db.execute(text("INSERT INTO notification (faculty_id, type, payload, status) VALUES (NULL, 'StudentProfileChangeResult', :p, 'Pending')"), {"p": json.dumps({"message": "Rejected"})})
+                    db.execute(text("INSERT INTO notification (faculty_id, type, payload, status) VALUES (NULL, 'StudentProfileChangeResult', :p, 'Pending')"), {"p": json.dumps({"message": "Rejected", "outcome": "rejected", "changes": _spc_changes})})
             except Exception:
                 pass
             db.execute(text("UPDATE notification SET status = 'Rejected' WHERE notification_id = :nid"), {"nid": notification_id})
-            _mirror("Student profile change request rejected.")
+            _mirror("Student profile change request rejected.",
+                    extra={"target_id": _spc_sid, "target_kind": "student",
+                           "target_name": _spc_name, "target_email": _spc_email})
             db.commit()
+            # NEW (Phase-1): detailed rejection email naming the exact rejected request.
+            try:
+                if _spc_email:
+                    send_change_detail_email(
+                        to_email=_spc_email,
+                        subject="Your profile change request was rejected",
+                        greeting_name=_spc_name, role_label="Student",
+                        intro=("After review, the administration has rejected your profile change request. "
+                               "The exact request that was rejected is detailed below. Your profile remains unchanged."),
+                        changes=_spc_changes,
+                        closing="If you need clarification, please contact the portal administration. A matching notification is waiting in your Notification Hub.",
+                        tone="danger")
+            except Exception:
+                pass
             return {"message": "Student profile change rejected. Student notified."}
 
     if notif.type == "StudentAccountDeletion":
@@ -2825,23 +3465,64 @@ def handle_notification(db: Session, notification_id: int, action: str, actor_id
                 except Exception:
                     sid = None
             if new_status == "Accepted" and sid:
+                try:
+                    _sad_name, _sad_email = _student_contact(db, sid)
+                except Exception:
+                    _sad_name, _sad_email = None, ""
                 db.execute(text("DELETE FROM user WHERE user_id = :sid"), {"sid": sid})
-                _mirror(f"Student account deletion request accepted (student {sid}).")
+                _mirror(f"Student account deletion request accepted (student {sid}).",
+                        extra={"target_id": sid, "target_kind": "student",
+                               "target_name": _sad_name, "target_email": _sad_email})
                 db.commit()
                 try:
                     _remove_credentials_json(sid)
+                except Exception:
+                    pass
+                # NEW (Phase-1): inform the address on record that the deletion was carried out.
+                try:
+                    if _sad_email:
+                        send_change_detail_email(
+                            to_email=_sad_email,
+                            subject="Your account deletion request was approved",
+                            greeting_name=_sad_name, role_label="Student",
+                            intro=("The administration has approved your account deletion request. "
+                                   "Your Research Management Portal account has now been permanently removed "
+                                   "along with all related data."),
+                            changes={},
+                            closing="If you believe this was a mistake, please contact the portal administration.",
+                            tone="info")
                 except Exception:
                     pass
                 return {"message": "Student account deleted."}
             else:
                 if sid:
                     try:
-                        db.execute(text("INSERT INTO notification (faculty_id, student_id, type, payload, status) VALUES (NULL, :sid, 'StudentAccountDeletionResult', :p, 'Pending')"), {"sid": sid, "p": json.dumps({"message": "Your deletion request was rejected.", "outcome": "rejected"})})
+                        _sadr_name, _sadr_email = _student_contact(db, sid)
+                    except Exception:
+                        _sadr_name, _sadr_email = None, ""
+                    try:
+                        db.execute(text("INSERT INTO notification (faculty_id, student_id, type, payload, status) VALUES (NULL, :sid, 'StudentAccountDeletionResult', :p, 'Pending')"), {"sid": sid, "p": json.dumps({"message": "Your account deletion request was reviewed by the administration and was rejected. Your account remains active and unchanged.", "outcome": "rejected", "student_id": sid})})
                     except Exception:
                         pass
                     db.execute(text("UPDATE notification SET status = 'Rejected' WHERE notification_id = :nid"), {"nid": notification_id})
-                    _mirror(f"Student account deletion request rejected (student {sid}).")
+                    _mirror(f"Student account deletion request rejected (student {sid}).",
+                            extra={"target_id": sid, "target_kind": "student",
+                                   "target_name": _sadr_name, "target_email": _sadr_email})
                     db.commit()
+                    # NEW (Phase-1): detailed rejection email.
+                    try:
+                        if _sadr_email:
+                            send_change_detail_email(
+                                to_email=_sadr_email,
+                                subject="Your account deletion request was rejected",
+                                greeting_name=_sadr_name, role_label="Student",
+                                intro=("After review, the administration has rejected your account deletion request. "
+                                       "Your account remains active and unchanged."),
+                                changes={},
+                                closing="A matching notification is waiting in your Notification Hub.",
+                                tone="danger")
+                    except Exception:
+                        pass
                     return {"message": "Student deletion rejected. Student notified."}
         except Exception as e:
             raise ValueError(str(e))
@@ -2873,7 +3554,7 @@ def get_faculty_notifications(db: Session, faculty_id: int):
     query = text("""SELECT notification_id, faculty_id, type, payload, status FROM notification
                     WHERE faculty_id = :faculty_id
                     AND (
-                        type IN ('AdminFacultyEditRequest', 'ProjectCreationResult', 'ProjectDeletionResult',
+                        type IN ('AdminFacultyEditRequest', 'AdminProjectEditRequest', 'ProjectCreationResult', 'ProjectDeletionResult',
                                  'AccountDeletionResult', 'DesignationChangeResult', 'SuperAdminProjectUpdate')
                         OR (type IN ('DesignationChange', 'ProjectCreation') AND status = 'AwaitingFacultyConfirmation')
                         OR (type = 'ProjectApplication' AND status IN ('Pending', 'Accepted', 'Rejected'))
@@ -3939,6 +4620,303 @@ def _log_admin_activity(db: Session, admin_id, action: str, notification_id=None
         return False
 
 
+# ---------------------------------------------------------------------------
+# Audit display builder (Phase-3: classy superadmin audit popup)
+# ---------------------------------------------------------------------------
+# Turns a raw AdminActivity record into a structured, human-readable `display`
+# object for the superadmin audit popup. Read-only: resolves names/emails/
+# titles live but always falls back to the frozen snapshot extras, so deleted
+# users still show full detail. Never raises — worst case returns a generic
+# display so the audit list never breaks.
+_ACTIVITY_ROLE_LABELS = {
+    "admin": "Administrator",
+    "faculty": "Faculty Member",
+    "student": "Student",
+}
+
+_ACTIVITY_FIELD_LABELS = {
+    "name": "Full Name",
+    "email": "Email",
+    "role": "Requested Role",
+    "department": "Department",
+    "designation": "Designation",
+    "office_hours": "Office Hours",
+    "research_areas": "Research Areas",
+    "cgpa": "CGPA",
+    "semester": "Semester",
+    "github_link": "GitHub Link",
+    "cv_link": "CV Link",
+    "skills": "Skills",
+    "interests": "Research Interests",
+    "title": "Project Title",
+    "description": "Description",
+    "required_skill": "Required Skill",
+    "status": "Status",
+}
+
+
+def _display_text(value):
+    try:
+        if value is None:
+            return "—"
+        if isinstance(value, list):
+            return ", ".join(str(x) for x in value) if value else "—"
+        s = str(value).strip()
+        return s if s != "" else "—"
+    except Exception:
+        return "—"
+
+
+def _resolve_activity_faculty(db, fid, extra):
+    info = {"kind": "faculty", "id": fid, "name": "—", "email": "—", "meta": {}}
+    try:
+        if fid is None:
+            return info
+        if isinstance(extra, dict):
+            if extra.get("target_name"):
+                info["name"] = str(extra.get("target_name"))
+            if extra.get("target_email"):
+                info["email"] = str(extra.get("target_email"))
+        try:
+            frow = db.execute(text("SELECT name, designation, department FROM faculty WHERE faculty_id = :f"),
+                              {"f": int(fid)}).fetchone()
+            if frow:
+                if info["name"] in ("—", "", None):
+                    info["name"] = frow.name or "—"
+                if frow.designation:
+                    info["meta"]["Designation"] = frow.designation
+                if frow.department:
+                    info["meta"]["Department"] = frow.department
+        except Exception:
+            pass
+        if info["email"] in ("—", "", None):
+            try:
+                _, em = _faculty_contact(db, int(fid))
+                if em:
+                    info["email"] = em
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return info
+
+
+def _resolve_activity_student(db, sid, extra):
+    info = {"kind": "student", "id": sid, "name": "—", "email": "—", "meta": {}}
+    try:
+        if sid is None:
+            return info
+        if isinstance(extra, dict):
+            if extra.get("target_name"):
+                info["name"] = str(extra.get("target_name"))
+            if extra.get("target_email"):
+                info["email"] = str(extra.get("target_email"))
+        try:
+            srow = db.execute(text("SELECT name, cgpa, department, semester FROM student WHERE student_id = :s"),
+                              {"s": int(sid)}).fetchone()
+            if srow:
+                if info["name"] in ("—", "", None):
+                    info["name"] = srow.name or "—"
+                if srow.cgpa is not None:
+                    info["meta"]["CGPA"] = str(srow.cgpa)
+                if srow.department:
+                    info["meta"]["Department"] = srow.department
+                if srow.semester:
+                    info["meta"]["Semester"] = srow.semester
+        except Exception:
+            pass
+        if info["email"] in ("—", "", None):
+            try:
+                _, em = _student_contact(db, int(sid))
+                if em:
+                    info["email"] = em
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return info
+
+
+def _activity_display(db, data):
+    """Build the popup-ready display object for one AdminActivity record."""
+    try:
+        data = dict(data) if isinstance(data, dict) else {}
+    except Exception:
+        data = {}
+    snap = data.get("snapshot") if isinstance(data.get("snapshot"), dict) else {}
+    payload = snap.get("payload") if isinstance(snap.get("payload"), dict) else {}
+    ntype = str(data.get("notification_type") or snap.get("type") or "")
+    action = str(data.get("action") or "")
+    actor_email = str(data.get("admin_email") or "")
+    actor_id = data.get("actor_id")
+    req_id = data.get("notification_id")
+
+    decision = ""
+    try:
+        low = action.lower()
+        if low.endswith("_accepted") or " accepted" in low or low.endswith("accepted"):
+            decision = "Accepted"
+        elif low.endswith("_rejected") or " rejected" in low or low.endswith("rejected"):
+            decision = "Rejected"
+    except Exception:
+        decision = ""
+    tone = "success" if decision == "Accepted" else ("danger" if decision == "Rejected" else "info")
+
+    display = {
+        "headline": str(data.get("detail") or action or "Admin activity"),
+        "action_label": action.replace("_", " ").title() if action else "Admin activity",
+        "decision": decision,
+        "tone": tone,
+        "actor": {"id": actor_id, "email": actor_email or "—"},
+        "request": {"type": ntype or "—", "id": req_id},
+        "target": {"kind": "unknown", "id": None, "name": "—", "email": "—", "meta": {}},
+        "applicant": {},
+        "changes": [],
+        "request_fields": [],
+        "detail": str(data.get("detail") or ""),
+    }
+
+    try:
+        # ---- 1) Signup decisions: full applicant dossier ----
+        if ntype in ("AdminSignup", "FacultySignup", "StudentSignup"):
+            role_key = {"AdminSignup": "admin", "FacultySignup": "faculty"}.get(ntype, "student")
+            role_label = _ACTIVITY_ROLE_LABELS.get(role_key, role_key.title())
+            applicant = {"Requested Role": role_label}
+            for f in ("name", "email", "department", "designation", "office_hours",
+                      "cgpa", "semester", "github_link", "cv_link",
+                      "skills", "interests", "research_areas"):
+                if payload.get(f) not in (None, "", []):
+                    applicant[_ACTIVITY_FIELD_LABELS.get(f, f.title())] = _display_text(payload.get(f))
+            if payload.get("sent_otp") or payload.get("entered_otp"):
+                applicant["OTP Status"] = str(payload.get("otp_status") or "—")
+            display["applicant"] = applicant
+            display["target"] = {"kind": role_key, "id": None,
+                                 "name": _display_text(payload.get("name") or payload.get("email")),
+                                 "email": _display_text(payload.get("email")), "meta": {}}
+            display["action_label"] = f"{role_label} Signup {decision or 'Request'}".strip()
+            who = _display_text(payload.get("name") or payload.get("email"))
+            display["headline"] = (f"{actor_email or 'An admin'} {decision.lower() or 'handled'} the {role_label} "
+                                   f"signup request of {who}")
+            return display
+
+        # ---- 2) Admin proposals (edit / project-edit) ----
+        if action in ("propose_faculty_edit", "propose_student_edit", "propose_project_edit"):
+            changes = snap.get("changes") if isinstance(snap.get("changes"), dict) else {}
+            display["changes"] = [{"label": _ACTIVITY_FIELD_LABELS.get(str(k).lower(), str(k).replace("_", " ").title()),
+                                   "old": _display_text(v.get("old") if isinstance(v, dict) else "—"),
+                                   "new": _display_text(v.get("new") if isinstance(v, dict) else v)}
+                                  for k, v in (changes or {}).items()]
+            if action == "propose_faculty_edit":
+                fid = snap.get("faculty_id")
+                display["target"] = _resolve_activity_faculty(db, fid, snap)
+                display["action_label"] = "Faculty Edit Proposed"
+                display["headline"] = (f"{actor_email or 'An admin'} proposed faculty profile edits for "
+                                       f"{display['target']['name']}")
+            elif action == "propose_student_edit":
+                sid = snap.get("student_id")
+                display["target"] = _resolve_activity_student(db, sid, snap)
+                display["action_label"] = "Student Edit Proposed"
+                display["headline"] = (f"{actor_email or 'An admin'} proposed student profile edits for "
+                                       f"{display['target']['name']}")
+            else:
+                pid = snap.get("project_id")
+                title = "—"
+                owner = {"kind": "faculty", "id": None, "name": "—", "email": "—", "meta": {}}
+                try:
+                    if pid is not None:
+                        proj = get_project_by_id(db=db, project_id=int(pid))
+                        if proj:
+                            title = proj.get("title") or "—"
+                            owner = _resolve_activity_faculty(db, proj.get("faculty_id"), snap)
+                except Exception:
+                    pass
+                display["target"] = {"kind": "project", "id": pid, "name": title,
+                                     "email": owner.get("email", "—"),
+                                     "meta": {"Owner": owner.get("name", "—")}}
+                display["action_label"] = "Project Edit Proposed"
+                display["headline"] = (f"{actor_email or 'An admin'} proposed project edits for "
+                                       f"'{title}' (owner: {owner.get('name', '—')})")
+            return display
+
+        # ---- 3) Request decisions (approve / reject of someone's request) ----
+        req_fid = snap.get("faculty_id")
+        extra_sid = snap.get("student_id", snap.get("target_id") if snap.get("target_kind") == "student" else None)
+        target = {"kind": "unknown", "id": None, "name": "—", "email": "—", "meta": {}}
+        if ntype in ("DesignationChange", "ProjectCreation", "ProjectDeletion", "AccountDeletion"):
+            target = _resolve_activity_faculty(db, req_fid, snap)
+        elif ntype in ("StudentProfileChange", "StudentAccountDeletion"):
+            target = _resolve_activity_student(db, extra_sid, snap)
+        # snapshot extras always win when live rows are gone
+        try:
+            if isinstance(snap.get("target_name"), str) and snap.get("target_name"):
+                target["name"] = snap.get("target_name")
+            if isinstance(snap.get("target_email"), str) and snap.get("target_email"):
+                target["email"] = snap.get("target_email")
+            if snap.get("target_id") is not None and target.get("id") is None:
+                target["id"] = snap.get("target_id")
+            if snap.get("target_kind"):
+                target["kind"] = snap.get("target_kind")
+        except Exception:
+            pass
+        display["target"] = target
+
+        req_title = ""
+        if ntype == "DesignationChange":
+            old = snap.get("old_designation")
+            new = snap.get("new_designation", payload.get("new_designation"))
+            if old is None:
+                try:
+                    orow = db.execute(text("SELECT designation FROM faculty WHERE faculty_id = :f"),
+                                      {"f": int(req_fid)}).fetchone() if req_fid is not None else None
+                    # live row holds the CURRENT value; frozen `old` wins when present
+                    if orow and decision != "Accepted":
+                        old = orow.designation
+                except Exception:
+                    pass
+            display["changes"] = [{"label": "Designation",
+                                   "old": _display_text(old), "new": _display_text(new)}]
+            display["action_label"] = f"Designation Change {decision or 'Handled'}".strip()
+            req_title = f"designation change ({_display_text(old)} → {_display_text(new)})"
+        elif ntype == "ProjectCreation":
+            for f in ("title", "description", "required_skill", "status"):
+                if payload.get(f) not in (None, ""):
+                    display["request_fields"].append({"label": _ACTIVITY_FIELD_LABELS.get(f, f.title()),
+                                                      "value": _display_text(payload.get(f))})
+            display["action_label"] = f"Project Creation {decision or 'Handled'}".strip()
+            req_title = f"project creation '{_display_text(payload.get('title'))}'"
+        elif ntype == "ProjectDeletion":
+            display["request_fields"].append({"label": "Project Title",
+                                              "value": _display_text(payload.get("title") or snap.get("project_title"))})
+            if payload.get("project_id") or snap.get("project_id"):
+                display["request_fields"].append({"label": "Project ID",
+                                                  "value": _display_text(payload.get("project_id") or snap.get("project_id"))})
+            display["action_label"] = f"Project Deletion {decision or 'Handled'}".strip()
+            req_title = f"project deletion '{display['request_fields'][0]['value']}'"
+        elif ntype == "AccountDeletion":
+            display["action_label"] = f"Faculty Account Deletion {decision or 'Handled'}".strip()
+            req_title = "faculty account deletion"
+        elif ntype == "StudentProfileChange":
+            changes = payload.get("changes") if isinstance(payload.get("changes"), dict) else {}
+            display["changes"] = [{"label": _ACTIVITY_FIELD_LABELS.get(str(k).lower(), str(k).replace("_", " ").title()),
+                                   "old": _display_text(v.get("old") if isinstance(v, dict) else "—"),
+                                   "new": _display_text(v.get("new") if isinstance(v, dict) else v)}
+                                  for k, v in (changes or {}).items()]
+            display["action_label"] = f"Student Profile Change {decision or 'Handled'}".strip()
+            req_title = "student profile change"
+        elif ntype == "StudentAccountDeletion":
+            display["action_label"] = f"Student Account Deletion {decision or 'Handled'}".strip()
+            req_title = "student account deletion"
+        else:
+            req_title = (ntype or "request").replace("_", " ")
+
+        verb = decision.lower() if decision else "handled"
+        display["headline"] = (f"{actor_email or 'An admin'} {verb} the {req_title} of {target.get('name', '—')}")
+        return display
+    except Exception:
+        pass
+    return display
+
+
 def send_info_email(to_email: str, subject: str, body_text: str):
     """Short administrative notice email (plain notice, no OTP box)."""
     if not to_email:
@@ -4368,6 +5346,10 @@ def get_audit_log(db: Session, actor_id: int, limit: int = 100):
         except Exception:
             data = {"detail": r.payload}
         if str(getattr(r, "type", "")) == "AdminActivity":
+            try:
+                _disp = _activity_display(db, data if isinstance(data, dict) else {})
+            except Exception:
+                _disp = {}
             out.append({
                 "notification_id": r.notification_id,
                 "type": r.type,
@@ -4383,6 +5365,7 @@ def get_audit_log(db: Session, actor_id: int, limit: int = 100):
                 "admin_email": data.get("admin_email"),
                 "notification_type": data.get("notification_type"),
                 "is_admin_activity": True,
+                "display": _disp,
             })
         else:
             out.append({
@@ -4416,6 +5399,10 @@ def get_admin_activity_log(db: Session, actor_id: int, limit: int = 200):
             data = json.loads(r.payload)
         except Exception:
             data = {}
+        try:
+            _disp = _activity_display(db, data if isinstance(data, dict) else {})
+        except Exception:
+            _disp = {}
         out.append({
             "notification_id": r.notification_id,
             "type": r.type,
@@ -4428,6 +5415,7 @@ def get_admin_activity_log(db: Session, actor_id: int, limit: int = 200):
             "notification_type": data.get("notification_type"),
             "detail": data.get("detail"),
             "snapshot": data.get("snapshot"),
+            "display": _disp,
         })
     return out
 
