@@ -192,6 +192,16 @@ INSERT INTO `faculty_research_areas` (`faculty_id`, `research_area`) VALUES
 (60, 'Ceramics'),
 (60, 'Surface Science');
 
+CREATE TABLE IF NOT EXISTS `notification` (
+  `notification_id` int(11) NOT NULL,
+  `faculty_id` int(11) DEFAULT NULL,
+  `type` varchar(100) NOT NULL,
+  `payload` text NOT NULL,
+  `status` varchar(50) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `student_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE `research_project` (
   `project_id` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,
@@ -446,6 +456,15 @@ INSERT INTO `student_interests` (`student_id`, `research_area`) VALUES
 (30, 'Composite Materials'),
 (30, 'Nanomaterials');
 
+CREATE TABLE IF NOT EXISTS `superadmin_chat` (
+  `chat_id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `sender` varchar(20) NOT NULL,
+  `message` text NOT NULL,
+  `is_read` tinyint(4) NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE `user` (
   `user_id` int(11) NOT NULL,
   `email` varchar(255) NOT NULL,
@@ -547,12 +566,26 @@ ALTER TABLE `student_skills`
 ALTER TABLE `student_interests`
   ADD PRIMARY KEY (`student_id`,`research_area`);
 
+ALTER TABLE `notification`
+  ADD PRIMARY KEY (`notification_id`),
+  ADD KEY `faculty_id` (`faculty_id`),
+  ADD KEY `ix_notification_notification_id` (`notification_id`);
+
+ALTER TABLE `superadmin_chat`
+  ADD PRIMARY KEY (`chat_id`);
+
 ALTER TABLE `user`
   ADD PRIMARY KEY (`user_id`),
   ADD UNIQUE KEY `email` (`email`);
 
 ALTER TABLE `research_project`
   MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+
+ALTER TABLE `notification`
+  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `superadmin_chat`
+  MODIFY `chat_id` int(11) NOT NULL AUTO_INCREMENT;
 
 ALTER TABLE `user`
   MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT;
@@ -578,6 +611,9 @@ ALTER TABLE `student_skills`
 
 ALTER TABLE `student_interests`
   ADD CONSTRAINT `student_interests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `student` (`student_id`) ON DELETE CASCADE;
+
+ALTER TABLE `notification`
+  ADD CONSTRAINT `notification_ibfk_1` FOREIGN KEY (`faculty_id`) REFERENCES `faculty` (`faculty_id`) ON DELETE CASCADE;
 
 COMMIT;
 
